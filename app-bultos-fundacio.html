@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro Automático de Bultos</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { max-width: 600px; width: 100%; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; margin-top: 0; }
+        .setup-box, .prendas-box, .manip-box { margin-bottom: 20px; background: #e1dfdd; padding: 15px; border-radius: 4px; text-align: center; }
+        .prendas-box { background: #fff4ce; border: 2px solid #ffaa44; display: none; }
+        .manip-box { background: #e8f0fe; border: 2px solid #0078d4; display: none; text-align: left; }
+        .manip-box h3 { text-align: center; margin-top: 0; }
+        .manip-list { max-height: 260px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; background: white; margin-bottom: 10px; }
+        .manip-item { padding: 12px 14px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 16px; }
+        .manip-item:last-child { border-bottom: none; }
+        .manip-item:hover, .manip-item:active { background: #f0f6fc; }
+        .counter { font-size: 20px; font-weight: bold; text-align: center; margin: 15px 0; color: #0078d4; }
+        .manip-actual { text-align: center; font-size: 14px; color: #555; margin-top: -10px; margin-bottom: 10px; }
+        .bottom-counter { background-color: #f0f6fc; border: 2px solid #0078d4; color: #005a9e; padding: 12px; font-size: 20px; font-weight: bold; text-align: center; border-radius: 6px; margin-top: 15px; }
+        .productividad { background-color: #eaf7ea; border: 2px solid #107c10; color: #0b5c0b; padding: 10px; font-size: 16px; font-weight: bold; text-align: center; border-radius: 6px; margin-top: 8px; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 15px; font-size: 18px; box-sizing: border-box; border: 2px solid #ccc; border-radius: 4px; outline: none; margin-top: 5px; }
+        input[type="text"]:focus, input[type="number"]:focus { border-color: #0078d4; }
+        .alert { background-color: #d83b01; color: white; padding: 15px; font-weight: bold; font-size: 15px; border-radius: 4px; margin-top: 15px; display: none; text-align: center; word-break: break-all; }
+        .success { background-color: #107c10; color: white; padding: 10px; font-weight: bold; border-radius: 4px; margin-top: 10px; display: none; text-align: center; }
+        .list-container { margin-top: 15px; max-height: 180px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #fafafa; border-radius: 4px; }
+        ul { padding-left: 0; margin: 0; list-style: none; }
+        li { font-size: 15px; padding: 6px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+        li .info { flex: 1; }
+        .prendas-editable { color: #0078d4; text-decoration: underline; cursor: pointer; font-weight: 600; padding: 2px 4px; }
+        .prendas-editable:hover { background: #eaf3fc; border-radius: 3px; }
+        .btn { margin-top:10px; width:100%; background:#0078d4; color:white; border:none; padding:12px; font-size:16px; border-radius:4px; cursor:pointer; }
+        .btn:hover { background: #005a9e; }
+        .btn-secundario { background:#5c6673; }
+        .btn-secundario:hover { background:#454d57; }
+        .btn-peligro { background:#a80000; }
+        .btn-peligro:hover { background:#7a0000; }
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:999; padding:20px; }
+        .modal-box { background:white; border-radius:8px; padding:20px; max-width:420px; width:100%; }
+        .modal-box h3 { margin-top:0; color:#a80000; }
+        .modal-box ul { list-style: disc; padding-left: 22px; margin-bottom: 16px; }
+        .modal-box li { display:list-item; border-bottom:none; padding:3px 0; font-size:15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Control de Bultos</h2>
+
+    <!-- Paso 1: Identificación del operario -->
+    <div class="setup-box" id="setupBox">
+        <label for="operarioInput"><strong>Identifícate para empezar:</strong></label><br>
+        <input type="text" id="operarioInput" placeholder="Escanea o escribe tu ID de Operario..." autocomplete="off">
+        <button class="btn" onclick="guardarOperario()">Comenzar Turno</button>
+    </div>
+
+    <!-- Paso 2: Selección de manipulación (inicial o por cambio) -->
+    <div class="manip-box" id="manipBox">
+        <h3>Selecciona la manipulación</h3>
+        <div class="manip-list" id="manipList">
+            <div style="padding:14px; text-align:center; color:#666;">Cargando listado...</div>
+        </div>
+        <button class="btn btn-secundario" id="cancelarManipBtn" style="display:none;" onclick="cerrarSelectorManipulacion()">Cancelar</button>
+    </div>
+
+    <!-- Panel de trabajo del escáner -->
+    <div id="scannerSection" style="display:none;">
+        <div class="counter" id="contador">Operario: <span id="lblOperario"></span></div>
+        <div class="manip-actual">Manipulación actual: <strong id="lblManipulacionActual">-</strong></div>
+
+        <div id="divEscaneo">
+            <input type="text" id="codeinput" placeholder="Dispara aquí el bulto..." autocomplete="off">
+        </div>
+
+        <div id="divPrendas" class="prendas-box">
+            <h3 style="margin-top:0; color:#333;">Bulto leído: <span id="lblCodigoActual" style="color:#0078d4;"></span></h3>
+            <label for="prendasInput"><strong>Número de prendas (Opcional):</strong></label><br>
+            <input type="number" id="prendasInput" placeholder="Dejar en blanco si no aplica..." min="1" autocomplete="off">
+            <button class="btn" style="background:#107c10;" onclick="enviarDatos(prendasInput.value)">Guardar Bulto</button>
+        </div>
+
+        <div id="successBox" class="success">¡Bulto guardado correctamente en la nube!</div>
+        <div id="alertBox" class="alert">¡ATENCIÓN! Error.</div>
+
+        <div class="list-container">
+            <ul id="listaBultos"></ul>
+        </div>
+
+        <div class="bottom-counter" id="bottomCounter">Total bultos escaneados: 0</div>
+        <div class="productividad" id="productividadBox">Productividad: 0,0 prendas/hora</div>
+
+        <button class="btn btn-secundario" style="margin-top:15px;" onclick="abrirCambioManipulacion()">Cambiar Manipulación</button>
+        <button class="btn" id="descansoBtn" style="margin-top:8px; background:#5c6673;" onclick="toggleDescanso()">Iniciar Descanso</button>
+        <button class="btn btn-peligro" style="font-size:14px; padding:8px;" tabindex="-1" onclick="cambiarOperario()">Finalizar / Cambiar Operario</button>
+    </div>
+</div>
+
+<!-- Modal de recordatorios al elegir manipulación -->
+<div class="modal-overlay" id="recordatoriosModal">
+    <div class="modal-box">
+        <h3>Antes de empezar, ten en cuenta:</h3>
+        <ul id="recordatoriosLista"></ul>
+        <button class="btn" onclick="confirmarManipulacionSeleccionada()">Entendido, empezar</button>
+    </div>
+</div>
+
+<script>
+    // === URLs de los flujos de Power Automate (rellenar con las tuyas) ===
+    const FLOW_URL = "https://TU_FLUJO_GUARDAR_BULTO_AQUI";
+    const FLOW_URL_EDITAR = "https://TU_FLUJO_EDITAR_PRENDAS_AQUI";
+    const FLOW_URL_MANIPULACIONES = "https://TU_FLUJO_LISTADO_MANIPULACIONES_AQUI";
+
+    let operarioActual = "";
+    let manipulacionActual = "";
+    let manipulacionPendienteSeleccion = null; // {codigo, recordatorio}
+    let esCambioDeManipulacion = false;
+    let codigoPendiente = "";
+    let totalBultos = 0;
+    const bultosSesion = new Set(); // solo para feedback inmediato; el bloqueo real por día lo hace el flujo
+
+    // Productividad: se acumula desde que se seleccionó/cambió de manipulación
+    let inicioManipulacionTs = null;
+    let prendasManipulacion = 0;
+    let productividadTimer = null;
+
+    // Descanso: el tiempo en pausa no cuenta para la productividad
+    let enDescanso = false;
+    let pausaInicioTs = null;
+    let pausaAcumuladaMs = 0;
+
+    const setupBox = document.getElementById('setupBox');
+    const manipBox = document.getElementById('manipBox');
+    const manipList = document.getElementById('manipList');
+    const cancelarManipBtn = document.getElementById('cancelarManipBtn');
+    const scannerSection = document.getElementById('scannerSection');
+    const operarioInput = document.getElementById('operarioInput');
+    const lblOperario = document.getElementById('lblOperario');
+    const lblManipulacionActual = document.getElementById('lblManipulacionActual');
+    const inputField = document.getElementById('codeinput');
+    const divEscaneo = document.getElementById('divEscaneo');
+    const divPrendas = document.getElementById('divPrendas');
+    const lblCodigoActual = document.getElementById('lblCodigoActual');
+    const prendasInput = document.getElementById('prendasInput');
+    const listaBultos = document.getElementById('listaBultos');
+    const bottomCounter = document.getElementById('bottomCounter');
+    const productividadBox = document.getElementById('productividadBox');
+    const alertBox = document.getElementById('alertBox');
+    const successBox = document.getElementById('successBox');
+    const recordatoriosModal = document.getElementById('recordatoriosModal');
+    const recordatoriosLista = document.getElementById('recordatoriosLista');
+
+    window.onload = function() {
+        operarioInput.focus();
+    };
+
+    operarioInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            guardarOperario();
+        }
+    });
+
+    function guardarOperario() {
+        const id = operarioInput.value.trim();
+        if (!id) {
+            alert("Por favor, introduce un ID de operario válido.");
+            return;
+        }
+        operarioActual = id;
+        lblOperario.textContent = id;
+        setupBox.style.display = 'none';
+        esCambioDeManipulacion = false;
+        abrirSelectorManipulacion();
+    }
+
+    // ---------- Selección / cambio de manipulación ----------
+
+    async function abrirSelectorManipulacion() {
+        manipBox.style.display = 'block';
+        cancelarManipBtn.style.display = esCambioDeManipulacion ? 'block' : 'none';
+        manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#666;">Cargando listado...</div>`;
+
+        try {
+            const response = await fetch(FLOW_URL_MANIPULACIONES, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) throw new Error(`Código ${response.status}`);
+            const data = await response.json(); // se espera [{codigo, recordatorio}, ...] ya ordenado
+
+            if (!Array.isArray(data) || data.length === 0) {
+                manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">No se ha podido cargar el listado.</div>`;
+                return;
+            }
+
+            manipList.innerHTML = '';
+            data.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'manip-item';
+                div.textContent = m.codigo;
+                div.onclick = () => seleccionarManipulacion(m.codigo, m.recordatorio || '');
+                manipList.appendChild(div);
+            });
+        } catch (error) {
+            manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">Error cargando manipulaciones: ${error.message}</div>`;
+        }
+    }
+
+    function seleccionarManipulacion(codigo, recordatorio) {
+        manipulacionPendienteSeleccion = codigo;
+        recordatoriosLista.innerHTML = '';
+        const lineas = (recordatorio || '').split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+        if (lineas.length === 0) {
+            confirmarManipulacionSeleccionada();
+            return;
+        }
+        lineas.forEach(linea => {
+            const li = document.createElement('li');
+            li.textContent = linea;
+            recordatoriosLista.appendChild(li);
+        });
+        recordatoriosModal.style.display = 'flex';
+    }
+
+    function confirmarManipulacionSeleccionada() {
+        recordatoriosModal.style.display = 'none';
+        manipulacionActual = manipulacionPendienteSeleccion;
+        lblManipulacionActual.textContent = manipulacionActual;
+
+        // Reinicia el contador de productividad para la nueva manipulación
+        inicioManipulacionTs = Date.now();
+        prendasManipulacion = 0;
+        enDescanso = false;
+        pausaInicioTs = null;
+        pausaAcumuladaMs = 0;
+        const descansoBtn = document.getElementById('descansoBtn');
+        if (descansoBtn) { descansoBtn.textContent = 'Iniciar Descanso'; descansoBtn.style.background = '#5c6673'; }
+        actualizarProductividad();
+        if (productividadTimer) clearInterval(productividadTimer);
+        productividadTimer = setInterval(actualizarProductividad, 30000);
+
+        manipBox.style.display = 'none';
+        scannerSection.style.display = 'block';
+        divEscaneo.style.display = 'block';
+        divPrendas.style.display = 'none';
+        inputField.focus();
+    }
+
+    function abrirCambioManipulacion() {
+        esCambioDeManipulacion = true;
+        scannerSection.style.display = 'none';
+        abrirSelectorManipulacion();
+    }
+
+    function cerrarSelectorManipulacion() {
+        manipBox.style.display = 'none';
+        scannerSection.style.display = 'block';
+        inputField.focus();
+    }
+
+    function actualizarProductividad() {
+        if (!inicioManipulacionTs) return;
+        const ahora = Date.now();
+        const pausaEnCurso = (enDescanso && pausaInicioTs) ? (ahora - pausaInicioTs) : 0;
+        const msTrabajados = (ahora - inicioManipulacionTs) - pausaAcumuladaMs - pausaEnCurso;
+        const horas = Math.max(msTrabajados, 0) / 3600000;
+        const productividad = horas > 0 ? (prendasManipulacion / horas) : 0;
+        productividadBox.textContent = `Productividad (${manipulacionActual}): ${productividad.toFixed(1)} prendas/hora`;
+    }
+
+    function toggleDescanso() {
+        const btn = document.getElementById('descansoBtn');
+        if (!enDescanso) {
+            enDescanso = true;
+            pausaInicioTs = Date.now();
+            inputField.disabled = true;
+            btn.textContent = 'Reanudar (en descanso)';
+            btn.style.background = '#ffaa44';
+        } else {
+            enDescanso = false;
+            pausaAcumuladaMs += (Date.now() - pausaInicioTs);
+            pausaInicioTs = null;
+            inputField.disabled = false;
+            inputField.focus();
+            btn.textContent = 'Iniciar Descanso';
+            btn.style.background = '#5c6673';
+            actualizarProductividad();
+        }
+    }
+
+    function cambiarOperario() {
+        if (confirm("¿Seguro que deseas finalizar la sesión de este operario?")) {
+            location.reload();
+        }
+    }
+
+    // Mantener el foco en el campo de lectura de bultos
+    document.addEventListener('click', () => {
+        if (scannerSection.style.display !== 'none' && divPrendas.style.display === 'none') {
+            inputField.focus();
+        }
+    });
+
+    // Guardián: fuerza el foco al campo correcto antes de que cualquier tecla
+    // (incluida una perdida de la pistola) pueda llegar a otro elemento
+    document.addEventListener('keydown', function(e) {
+        if (enDescanso) return; // en descanso no se fuerza el foco al escáner
+        let campoCorrecto;
+        if (setupBox.style.display !== 'none') {
+            campoCorrecto = operarioInput;
+        } else if (divPrendas.style.display === 'block') {
+            campoCorrecto = prendasInput;
+        } else if (scannerSection.style.display !== 'none') {
+            campoCorrecto = inputField;
+        } else {
+            return; // pantalla de selección de manipulación: no forzar foco
+        }
+        if (document.activeElement !== campoCorrecto) {
+            campoCorrecto.focus();
+        }
+    }, true);
+
+    // Filtro estricto para ignorar comandos extra de la pistola al leer el bulto
+    inputField.addEventListener('keydown', function(event) {
+        if (event.key.startsWith('F') && event.key.length > 1) {
+            event.preventDefault();
+            return;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const codigo = inputField.value.trim();
+            if (!codigo) return;
+
+            alertBox.style.display = 'none';
+            successBox.style.display = 'none';
+
+            if (bultosSesion.has(codigo)) {
+                alertBox.textContent = "¡ALERTA! Este bulto ya lo has escaneado tú hoy.";
+                alertBox.style.display = 'block';
+                playBeep(150);
+                inputField.value = '';
+                return;
+            }
+
+            codigoPendiente = codigo;
+            lblCodigoActual.textContent = codigo;
+            inputField.value = '';
+
+            divEscaneo.style.display = 'none';
+            divPrendas.style.display = 'block';
+            prendasInput.value = '';
+            prendasInput.focus();
+        }
+    });
+
+    prendasInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            enviarDatos(prendasInput.value);
+        }
+    });
+
+    async function enviarDatos(numPrendas) {
+        divPrendas.style.display = 'none';
+        divEscaneo.style.display = 'block';
+
+        try {
+            const response = await fetch(FLOW_URL, {
+                method: 'POST',
+                mode: 'cors',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    operario: operarioActual,
+                    codigo: codigoPendiente,
+                    manipulacion: manipulacionActual,
+                    prendas: numPrendas ? numPrendas : "",
+                    fecha: new Date().toISOString()
+                })
+            });
+
+            if (response.status === 409) {
+                // Duplicado detectado en el servidor (mismo operario, mismo bulto, mismo día natural)
+                alertBox.textContent = "¡ALERTA! Este bulto ya lo has escaneado tú hoy.";
+                alertBox.style.display = 'block';
+                playBeep(150);
+            } else if (response.ok) {
+                bultosSesion.add(codigoPendiente);
+                totalBultos++;
+
+                const prendasNum = parseFloat(numPrendas) || 0;
+                prendasManipulacion += prendasNum;
+                actualizarProductividad();
+
+                agregarFilaHistorial(codigoPendiente, numPrendas);
+
+                bottomCounter.textContent = `Total bultos escaneados: ${totalBultos}`;
+                successBox.style.display = 'block';
+                playBeep(600);
+            } else {
+                throw new Error(`Código ${response.status}`);
+            }
+        } catch (error) {
+            alertBox.textContent = "Error al guardar en la nube: " + error.message;
+            alertBox.style.display = 'block';
+            playBeep(100);
+        }
+
+        codigoPendiente = "";
+        inputField.focus();
+    }
+
+    function renderInfoHtml(codigo, prendas) {
+        const texto = prendas ? prendas : 'añadir';
+        return `${codigo} (<span class="prendas-editable" title="Tocar para editar">${texto}</span> prendas) - [Guardado]`;
+    }
+
+    function engancharClickPrendas(li, infoSpan) {
+        const span = infoSpan.querySelector('.prendas-editable');
+        if (span) span.addEventListener('click', () => iniciarEdicionPrendas(li, infoSpan));
+    }
+
+    function agregarFilaHistorial(codigo, prendas) {
+        const li = document.createElement('li');
+        li.dataset.codigo = codigo;
+        li.dataset.prendas = prendas || '';
+
+        const infoSpan = document.createElement('span');
+        infoSpan.className = 'info';
+        infoSpan.innerHTML = renderInfoHtml(codigo, prendas);
+        li.appendChild(infoSpan);
+
+        listaBultos.prepend(li);
+        engancharClickPrendas(li, infoSpan);
+    }
+
+    // Edición en línea: al tocar el número de prendas de un bulto ya guardado
+    function iniciarEdicionPrendas(li, infoSpan) {
+        const codigo = li.dataset.codigo;
+        const prendasActuales = li.dataset.prendas || '';
+
+        infoSpan.innerHTML = '';
+        infoSpan.appendChild(document.createTextNode(codigo + ' ('));
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = '0';
+        input.value = prendasActuales;
+        input.style.cssText = 'width:70px; padding:4px; font-size:14px; display:inline-block; margin:0 4px;';
+        infoSpan.appendChild(input);
+
+        infoSpan.appendChild(document.createTextNode(' prendas) '));
+
+        const confirmarBtn = document.createElement('button');
+        confirmarBtn.textContent = 'OK';
+        confirmarBtn.style.cssText = 'padding:4px 10px; font-size:13px; cursor:pointer;';
+        confirmarBtn.onclick = () => guardarEdicionPrendas(li, infoSpan, input.value);
+        infoSpan.appendChild(confirmarBtn);
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                guardarEdicionPrendas(li, infoSpan, input.value);
+            }
+        });
+
+        input.focus();
+        input.select();
+    }
+
+    async function guardarEdicionPrendas(li, infoSpan, nuevoValor) {
+        const codigo = li.dataset.codigo;
+        const valorAnterior = parseFloat(li.dataset.prendas) || 0;
+
+        try {
+            const response = await fetch(FLOW_URL_EDITAR, {
+                method: 'POST',
+                mode: 'cors',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    operario: operarioActual,
+                    codigo: codigo,
+                    fecha: new Date().toISOString(),
+                    prendas: nuevoValor
+                })
+            });
+
+            if (!response.ok) throw new Error(`Código ${response.status}`);
+
+            const valorNuevo = parseFloat(nuevoValor) || 0;
+            prendasManipulacion += (valorNuevo - valorAnterior);
+            actualizarProductividad();
+
+            li.dataset.prendas = nuevoValor || '';
+            infoSpan.innerHTML = renderInfoHtml(codigo, nuevoValor);
+            engancharClickPrendas(li, infoSpan);
+            playBeep(600);
+        } catch (error) {
+            alert("No se pudo actualizar: " + error.message);
+            infoSpan.innerHTML = renderInfoHtml(codigo, li.dataset.prendas);
+            engancharClickPrendas(li, infoSpan);
+        }
+    }
+
+    function playBeep(freq) {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.value = freq;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            setTimeout(() => osc.stop(), 150);
+        } catch(e) {}
+    }
+</script>
+
+</body>
+</html>
