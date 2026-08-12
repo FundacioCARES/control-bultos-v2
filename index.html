@@ -183,8 +183,9 @@
 
         try {
             const response = await fetch(FLOW_URL_MANIPULACIONES, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' }
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
             });
             if (!response.ok) throw new Error(`Código ${response.status}`);
             const data = await response.json(); // se espera [{codigo, recordatorio}, ...] ya ordenado
