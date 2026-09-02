@@ -56,6 +56,7 @@
     </div>
 
     <!-- Paso 2: Selección de manipulación (inicial o por cambio) -->
+    <input type="text" id="manipSearchInput" placeholder="Buscar manipulación..." style="width:100%; padding:12px; font-size:16px; border:2px solid #ccc; border-radius:4px; margin-bottom:10px; box-sizing:border-box;" autocomplete="off">
     <div class="manip-box" id="manipBox">
         <h3>Selecciona la manipulación</h3>
         <div class="manip-list" id="manipList">
@@ -176,37 +177,54 @@
 
     // ---------- Selección / cambio de manipulación ----------
 
-    async function abrirSelectorManipulacion() {
-        manipBox.style.display = 'block';
-        cancelarManipBtn.style.display = esCambioDeManipulacion ? 'block' : 'none';
-        manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#666;">Cargando listado...</div>`;
+    let manipulacionesData = [];
 
-        try {
-            const response = await fetch(FLOW_URL_MANIPULACIONES, {
-                method: 'POST',
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
-            });
-            if (!response.ok) throw new Error(`Código ${response.status}`);
-            const data = await response.json(); // se espera [{codigo, recordatorio}, ...] ya ordenado
+async function abrirSelectorManipulacion() {
+    manipBox.style.display = 'block';
+    cancelarManipBtn.style.display = esCambioDeManipulacion ? 'block' : 'none';
+    document.getElementById('manipSearchInput').value = '';
+    manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#666;">Cargando listado...</div>`;
 
-            if (!Array.isArray(data) || data.length === 0) {
-                manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">No se ha podido cargar el listado.</div>`;
-                return;
-            }
+    try {
+        const response = await fetch(FLOW_URL_MANIPULACIONES, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        if (!response.ok) throw new Error(`Código ${response.status}`);
+        const data = await response.json();
 
-            manipList.innerHTML = '';
-            data.forEach(m => {
-                const div = document.createElement('div');
-                div.className = 'manip-item';
-                div.textContent = m.codigo;
-                div.onclick = () => seleccionarManipulacion(m.codigo, m.recordatorio || '');
-                manipList.appendChild(div);
-            });
-        } catch (error) {
-            manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">Error cargando manipulaciones: ${error.message}</div>`;
+        if (!Array.isArray(data) || data.length === 0) {
+            manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">No se ha podido cargar el listado.</div>`;
+            return;
         }
+        manipulacionesData = data;
+        renderManipList(data);
+    } catch (error) {
+        manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">Error cargando manipulaciones: ${error.message}</div>`;
     }
+}
+
+function renderManipList(data) {
+    manipList.innerHTML = '';
+    if (data.length === 0) {
+        manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#666;">Sin resultados.</div>`;
+        return;
+    }
+    data.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'manip-item';
+        div.textContent = m.codigo;
+        div.onclick = () => seleccionarManipulacion(m.codigo, m.recordatorio || '');
+        manipList.appendChild(div);
+    });
+}
+
+document.getElementById('manipSearchInput').addEventListener('input', (e) => {
+    const texto = e.target.value.toLowerCase();
+    const filtrado = manipulacionesData.filter(m => m.codigo.toLowerCase().includes(texto));
+    renderManipList(filtrado);
+});
 
     function seleccionarManipulacion(codigo, recordatorio) {
         manipulacionPendienteSeleccion = codigo;
