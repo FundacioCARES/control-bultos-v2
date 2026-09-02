@@ -273,6 +273,7 @@ document.getElementById('manipSearchInput').addEventListener('input', (e) => {
     }
 
     function confirmarManipulacionSeleccionada() {
+        finalizarSesionActual().then(() => iniciarSesion(manipulacionPendienteSeleccion));
         recordatoriosModal.style.display = 'none';
         manipulacionActual = manipulacionPendienteSeleccion;
         lblManipulacionActual.textContent = manipulacionActual;
@@ -325,6 +326,7 @@ document.getElementById('manipSearchInput').addEventListener('input', (e) => {
             pausaInicioTs = Date.now();
             inputField.disabled = true;
             btn.textContent = 'Reanudar (en descanso)';
+            finalizarSesionActual().then(() => iniciarSesion(manipulacionActual));
             btn.style.background = '#ffaa44';
         } else {
             enDescanso = false;
@@ -333,15 +335,17 @@ document.getElementById('manipSearchInput').addEventListener('input', (e) => {
             inputField.disabled = false;
             inputField.focus();
             btn.textContent = 'Iniciar Descanso';
+            finalizarSesionActual().then(() => iniciarSesion('DESCANSO'));
             btn.style.background = '#5c6673';
             actualizarProductividad();
         }
     }
 
     function cambiarOperario() {
+        finalizarSesionActual();
         if (confirm("¿Seguro que deseas finalizar la sesión de este operario?")) {
             location.reload();
-        }
+                   }
     }
 
     // Mantener el foco en el campo de lectura de bultos
