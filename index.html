@@ -113,6 +113,32 @@
     const FLOW_URL_EDITAR = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/31/workflows/215b8689c35d46e489b8ebc1a9683ca2/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=43G-UsBvFyeY8wNZmPw8oNurUYq5lVxXXnmwb72S4UI";
     const FLOW_URL_MANIPULACIONES = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/9f4ee7bb146c4bb89128a1d26819a783/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ozOXFbMUbsrHLlNyP9pBuiVzW2iv24zbwEj9gfSy9Vc";
     const FLOW_URL_COMPROBAR = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/6b1a7900cc964c869bd27082251d6fc5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=w_BwywyIB_PROhrkEu1J68h7WaYgY_vfezi4iV5pVKQ"
+    const FLOW_URL_SESION_INICIO = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/13/workflows/77e5897eaf494f229bfe0e3494e0c9d3/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=GiL52Ip1FyODK2cefAg0__-Dws2ysXTymNSO5Nx-Odc";
+    const FLOW_URL_SESION_FIN = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/16/workflows/d14828a681324753b681a52e4d71e660/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jaqEFLD223k6t2qadslVsEWcFng89wucRxVv9-dsxWQ";
+    let sesionActualId = null;
+
+async function iniciarSesion(nombreManipulacion) {
+    try {
+        const r = await fetch(FLOW_URL_SESION_INICIO, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ operario: operarioActual, manipulacion: nombreManipulacion })
+        });
+        const data = await r.json();
+        sesionActualId = data.id;
+    } catch (e) { console.error('No se pudo iniciar sesión', e); }
+}
+
+async function finalizarSesionActual() {
+    if (!sesionActualId) return;
+    const idParaCerrar = sesionActualId;
+    sesionActualId = null;
+    try {
+        await fetch(FLOW_URL_SESION_FIN, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ id: idParaCerrar })
+        });
+    } catch (e) { console.error('No se pudo cerrar sesión', e); }
+}
     
     let operarioActual = "";
     let manipulacionActual = "";
