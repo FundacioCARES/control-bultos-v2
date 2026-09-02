@@ -413,6 +413,8 @@ document.getElementById('manipSearchInput').addEventListener('input', (e) => {
             } else if (response.ok) {
                 bultosSesion.add(codigoPendiente);
                 totalBultos++;
+                totalPrendasGlobal += parseFloat(numPrendas) || 0;
+                document.getElementById('prendasCounter').textContent = `Total prendas: ${totalPrendasGlobal}`;
 
                 const prendasNum = parseFloat(numPrendas) || 0;
                 prendasManipulacion += prendasNum;
