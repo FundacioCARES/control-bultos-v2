@@ -520,6 +520,8 @@ document.getElementById('manipSearchInput').addEventListener('input', (e) => {
 
             const valorNuevo = parseFloat(nuevoValor) || 0;
             prendasManipulacion += (valorNuevo - valorAnterior);
+            totalPrendasGlobal += (valorNuevo - valorAnterior);
+            document.getElementById('prendasCounter').textContent = `Total prendas: ${totalPrendasGlobal}`;
             actualizarProductividad();
 
             li.dataset.prendas = nuevoValor || '';
