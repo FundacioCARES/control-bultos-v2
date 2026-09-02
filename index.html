@@ -357,7 +357,7 @@ document.getElementById('manipSearchInput').addEventListener('input', (e) => {
             successBox.style.display = 'none';
 
             if (bultosSesion.has(codigo)) {
-                alertBox.textContent = "¡ALERTA! Este bulto ya lo has escaneado tú hoy.";
+                alertBox.textContent = "¡ALERTA! Este bulto ya ha sido escaneado.";
                 alertBox.style.display = 'block';
                 playBeep(150);
                 inputField.value = '';
