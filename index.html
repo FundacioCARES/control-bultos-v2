@@ -441,7 +441,7 @@ inputField.addEventListener('keydown', async function(event) {
 
             if (response.status === 409) {
                 // Duplicado detectado en el servidor (mismo operario, mismo bulto, mismo día natural)
-                alertBox.textContent = "¡ALERTA! Este bulto ya lo has escaneado tú hoy.";
+                alertBox.textContent = "¡ALERTA! Este bulto ya ha sido registrado.";
                 alertBox.style.display = 'block';
                 playBeep(150);
             } else if (response.ok) {
