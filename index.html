@@ -359,6 +359,7 @@ document.getElementById('manipSearchInput').addEventListener('input', (e) => {
     // (incluida una perdida de la pistola) pueda llegar a otro elemento
     document.addEventListener('keydown', function(e) {
         if (enDescanso) return; // en descanso no se fuerza el foco al escáner
+        if (document.activeElement && document.activeElement.id === 'inputEdicionPrendas') return; // no interferir mientras se edita el bulto guardado
         let campoCorrecto;
         if (setupBox.style.display !== 'none') {
             campoCorrecto = operarioInput;
