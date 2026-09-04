@@ -88,8 +88,10 @@
             <ul id="listaBultos"></ul>
         </div>
 
-        <div class="bottom-counter" id="bottomCounter">Total bultos escaneados: 0</div>
-        <div class="bottom-counter" id="prendasCounter" style="background-color:#fff4ce; border-color:#ffaa44; color:#8a5a00;">Total prendas: 0</div>
+        <div style="display:flex; gap:8px; margin-top:15px;">
+    <div class="bottom-counter" id="bottomCounter" style="margin-top:0; flex:1; font-size:15px; padding:10px 6px;">Bultos: 0</div>
+    <div class="bottom-counter" id="prendasCounter" style="margin-top:0; flex:1; font-size:15px; padding:10px 6px; background-color:#fff4ce; border-color:#ffaa44; color:#8a5a00;">Prendas: 0</div>
+    </div>
         <div class="productividad" id="productividadBox">Productividad: 0,0 prendas/hora</div>
 
         <button class="btn btn-secundario" style="margin-top:15px;" onclick="abrirCambioManipulacion()">Cambiar Manipulación</button>
