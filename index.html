@@ -322,27 +322,26 @@
     }
 
     function toggleDescanso() {
-        const btn = document.getElementById('descansoBtn');
-        if (!enDescanso) {
-            enDescanso = true;
-            pausaInicioTs = Date.now();
-            inputField.disabled = true;
-            btn.textContent = 'Reanudar (en descanso)';
-            finalizarSesionActual().then(() => iniciarSesion(manipulacionActual));
-            btn.style.background = '#ffaa44';
-        } else {
-            enDescanso = false;
-            pausaAcumuladaMs += (Date.now() - pausaInicioTs);
-            pausaInicioTs = null;
-            inputField.disabled = false;
-            inputField.focus();
-            btn.textContent = 'Iniciar Descanso';
-            finalizarSesionActual().then(() => iniciarSesion(manipulacionActual));
-            btn.style.background = '#5c6673';
-            actualizarProductividad();
-        }
+    const btn = document.getElementById('descansoBtn');
+    if (!enDescanso) {
+        enDescanso = true;
+        pausaInicioTs = Date.now();
+        inputField.disabled = true;
+        btn.textContent = 'Reanudar (en descanso)';
+        finalizarSesionActual().then(() => iniciarSesion('DESCANSO'));
+        btn.style.background = '#ffaa44';
+    } else {
+        enDescanso = false;
+        pausaAcumuladaMs += (Date.now() - pausaInicioTs);
+        pausaInicioTs = null;
+        inputField.disabled = false;
+        inputField.focus();
+        btn.textContent = 'Iniciar Descanso';
+        finalizarSesionActual().then(() => iniciarSesion(manipulacionActual));
+        btn.style.background = '#5c6673';
+        actualizarProductividad();
     }
-
+}
     function cambiarOperario() {
         if (confirm("¿Seguro que deseas finalizar la sesión de este operario?")) {
             finalizarSesionActual();
