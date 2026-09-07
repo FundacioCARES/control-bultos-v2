@@ -560,7 +560,7 @@ inputField.addEventListener('keydown', async function(event) {
             const valorNuevo = parseFloat(nuevoValor) || 0;
             prendasManipulacion += (valorNuevo - valorAnterior);
             totalPrendasGlobal += (valorNuevo - valorAnterior);
-            document.getElementById('prendasCounter').textContent = `Total prendas: ${totalPrendasGlobal}`;
+            document.getElementById('prendasCounter').textContent = `Prendas: ${totalPrendasGlobal}`;`
             actualizarProductividad();
 
             li.dataset.prendas = nuevoValor || '';
