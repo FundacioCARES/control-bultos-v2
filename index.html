@@ -351,11 +351,12 @@
     }
 
     // Mantener el foco en el campo de lectura de bultos
-    document.addEventListener('click', () => {
-        if (scannerSection.style.display !== 'none' && divPrendas.style.display === 'none') {
-            inputField.focus();
-        }
-    });
+    document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('#ultimoBultoBox')) return; // no interferir en la edición de prendas
+    if (scannerSection.style.display !== 'none' && divPrendas.style.display === 'none') {
+        inputField.focus();
+    }
+});
 
     // Guardián: fuerza el foco al campo correcto antes de que cualquier tecla
     // (incluida una perdida de la pistola) pueda llegar a otro elemento
