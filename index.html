@@ -24,10 +24,6 @@
         input[type="text"]:focus, input[type="number"]:focus { border-color: #0078d4; }
         .alert { background-color: #d83b01; color: white; padding: 15px; font-weight: bold; font-size: 15px; border-radius: 4px; margin-top: 15px; display: none; text-align: center; word-break: break-all; }
         .success { background-color: #107c10; color: white; padding: 10px; font-weight: bold; border-radius: 4px; margin-top: 10px; display: none; text-align: center; }
-        .list-container { margin-top: 15px; max-height: 180px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #fafafa; border-radius: 4px; }
-        ul { padding-left: 0; margin: 0; list-style: none; }
-        li { font-size: 15px; padding: 6px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-        li .info { flex: 1; }
         .prendas-editable { color: #0078d4; text-decoration: underline; cursor: pointer; font-weight: 600; padding: 2px 4px; }
         .prendas-editable:hover { background: #eaf3fc; border-radius: 3px; }
         .btn { margin-top:10px; width:100%; background:#0078d4; color:white; border:none; padding:12px; font-size:16px; border-radius:4px; cursor:pointer; }
@@ -84,14 +80,15 @@
         <div id="successBox" class="success">¡Bulto guardado correctamente en la nube!</div>
         <div id="alertBox" class="alert">¡ATENCIÓN! Error.</div>
 
-        <div class="list-container">
-            <ul id="listaBultos"></ul>
+        <!-- Solo se muestra el último bulto guardado, editable -->
+        <div id="ultimoBultoBox" style="display:none; background:#fafafa; border:1px solid #ddd; border-radius:4px; padding:10px 14px; margin-top:15px; font-size:15px;">
+            <span class="info" id="ultimoBultoInfo"></span>
         </div>
 
         <div style="display:flex; gap:8px; margin-top:15px;">
-    <div class="bottom-counter" id="bottomCounter" style="margin-top:0; flex:1; font-size:15px; padding:10px 6px;">Bultos: 0</div>
-    <div class="bottom-counter" id="prendasCounter" style="margin-top:0; flex:1; font-size:15px; padding:10px 6px; background-color:#fff4ce; border-color:#ffaa44; color:#8a5a00;">Prendas: 0</div>
-    </div>
+            <div class="bottom-counter" id="bottomCounter" style="margin-top:0; flex:1; font-size:15px; padding:10px 6px;">Bultos: 0</div>
+            <div class="bottom-counter" id="prendasCounter" style="margin-top:0; flex:1; font-size:15px; padding:10px 6px; background-color:#fff4ce; border-color:#ffaa44; color:#8a5a00;">Prendas: 0</div>
+        </div>
         <div class="productividad" id="productividadBox">Productividad: 0,0 prendas/hora</div>
 
         <button class="btn btn-secundario" style="margin-top:15px;" onclick="abrirCambioManipulacion()">Cambiar Manipulación</button>
@@ -110,38 +107,39 @@
 </div>
 
 <script>
-    // === URLs de los flujos de Power Automate (rellenar con las tuyas) ===
+    // === URLs de los flujos de Power Automate ===
     const FLOW_URL = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/4b4df6e183d1416fbb15abeb8a5736ee/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=xePCUuDh1Bf9M19Bq8XrBpoZzkChw7PeGm50K8Fq6PU";
     const FLOW_URL_EDITAR = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/31/workflows/215b8689c35d46e489b8ebc1a9683ca2/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=43G-UsBvFyeY8wNZmPw8oNurUYq5lVxXXnmwb72S4UI";
     const FLOW_URL_MANIPULACIONES = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/9f4ee7bb146c4bb89128a1d26819a783/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ozOXFbMUbsrHLlNyP9pBuiVzW2iv24zbwEj9gfSy9Vc";
     const FLOW_URL_COMPROBAR = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/6b1a7900cc964c869bd27082251d6fc5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=w_BwywyIB_PROhrkEu1J68h7WaYgY_vfezi4iV5pVKQ";
     const FLOW_URL_SESION_INICIO = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/13/workflows/77e5897eaf494f229bfe0e3494e0c9d3/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=GiL52Ip1FyODK2cefAg0__-Dws2ysXTymNSO5Nx-Odc";
     const FLOW_URL_SESION_FIN = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/16/workflows/d14828a681324753b681a52e4d71e660/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jaqEFLD223k6t2qadslVsEWcFng89wucRxVv9-dsxWQ";
+
     let sesionActualId = null;
 
-async function iniciarSesion(nombreManipulacion) {
-    try {
-        const r = await fetch(FLOW_URL_SESION_INICIO, {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ operario: operarioActual, manipulacion: nombreManipulacion })
-        });
-        const data = await r.json();
-        sesionActualId = data.id;
-    } catch (e) { console.error('No se pudo iniciar sesión', e); }
-}
+    async function iniciarSesion(nombreManipulacion) {
+        try {
+            const r = await fetch(FLOW_URL_SESION_INICIO, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ operario: operarioActual, manipulacion: nombreManipulacion })
+            });
+            const data = await r.json();
+            sesionActualId = data.id;
+        } catch (e) { console.error('No se pudo iniciar sesión', e); }
+    }
 
-async function finalizarSesionActual() {
-    if (!sesionActualId) return;
-    const idParaCerrar = sesionActualId;
-    sesionActualId = null;
-    try {
-        await fetch(FLOW_URL_SESION_FIN, {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ id: idParaCerrar })
-        });
-    } catch (e) { console.error('No se pudo cerrar sesión', e); }
-}
-    
+    async function finalizarSesionActual() {
+        if (!sesionActualId) return;
+        const idParaCerrar = sesionActualId;
+        sesionActualId = null;
+        try {
+            await fetch(FLOW_URL_SESION_FIN, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ id: idParaCerrar })
+            });
+        } catch (e) { console.error('No se pudo cerrar sesión', e); }
+    }
+
     let operarioActual = "";
     let manipulacionActual = "";
     let manipulacionPendienteSeleccion = null; // {codigo, recordatorio}
@@ -149,7 +147,7 @@ async function finalizarSesionActual() {
     let codigoPendiente = "";
     let totalBultos = 0;
     let totalPrendasGlobal = 0;
-    const bultosSesion = new Set(); // solo para feedback inmediato; el bloqueo real por día lo hace el flujo
+    const bultosSesion = new Set(); // solo para feedback inmediato; el bloqueo real lo hace el flujo
 
     // Productividad: se acumula desde que se seleccionó/cambió de manipulación
     let inicioManipulacionTs = null;
@@ -174,8 +172,10 @@ async function finalizarSesionActual() {
     const divPrendas = document.getElementById('divPrendas');
     const lblCodigoActual = document.getElementById('lblCodigoActual');
     const prendasInput = document.getElementById('prendasInput');
-    const listaBultos = document.getElementById('listaBultos');
+    const ultimoBultoBox = document.getElementById('ultimoBultoBox');
+    const ultimoBultoInfo = document.getElementById('ultimoBultoInfo');
     const bottomCounter = document.getElementById('bottomCounter');
+    const prendasCounter = document.getElementById('prendasCounter');
     const productividadBox = document.getElementById('productividadBox');
     const alertBox = document.getElementById('alertBox');
     const successBox = document.getElementById('successBox');
@@ -210,52 +210,52 @@ async function finalizarSesionActual() {
 
     let manipulacionesData = [];
 
-async function abrirSelectorManipulacion() {
-    manipBox.style.display = 'block';
-    cancelarManipBtn.style.display = esCambioDeManipulacion ? 'block' : 'none';
-    document.getElementById('manipSearchInput').value = '';
-    manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#666;">Cargando listado...</div>`;
+    async function abrirSelectorManipulacion() {
+        manipBox.style.display = 'block';
+        cancelarManipBtn.style.display = esCambioDeManipulacion ? 'block' : 'none';
+        document.getElementById('manipSearchInput').value = '';
+        manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#666;">Cargando listado...</div>`;
 
-    try {
-        const response = await fetch(FLOW_URL_MANIPULACIONES, {
-            method: 'POST',
-            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-        });
-        if (!response.ok) throw new Error(`Código ${response.status}`);
-        const data = await response.json();
+        try {
+            const response = await fetch(FLOW_URL_MANIPULACIONES, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            if (!response.ok) throw new Error(`Código ${response.status}`);
+            const data = await response.json();
 
-        if (!Array.isArray(data) || data.length === 0) {
-            manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">No se ha podido cargar el listado.</div>`;
+            if (!Array.isArray(data) || data.length === 0) {
+                manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">No se ha podido cargar el listado.</div>`;
+                return;
+            }
+            manipulacionesData = data;
+            renderManipList(data);
+        } catch (error) {
+            manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">Error cargando manipulaciones: ${error.message}</div>`;
+        }
+    }
+
+    function renderManipList(data) {
+        manipList.innerHTML = '';
+        if (data.length === 0) {
+            manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#666;">Sin resultados.</div>`;
             return;
         }
-        manipulacionesData = data;
-        renderManipList(data);
-    } catch (error) {
-        manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">Error cargando manipulaciones: ${error.message}</div>`;
+        data.forEach(m => {
+            const div = document.createElement('div');
+            div.className = 'manip-item';
+            div.textContent = m.codigo;
+            div.onclick = () => seleccionarManipulacion(m.codigo, m.recordatorio || '');
+            manipList.appendChild(div);
+        });
     }
-}
 
-function renderManipList(data) {
-    manipList.innerHTML = '';
-    if (data.length === 0) {
-        manipList.innerHTML = `<div style="padding:14px; text-align:center; color:#666;">Sin resultados.</div>`;
-        return;
-    }
-    data.forEach(m => {
-        const div = document.createElement('div');
-        div.className = 'manip-item';
-        div.textContent = m.codigo;
-        div.onclick = () => seleccionarManipulacion(m.codigo, m.recordatorio || '');
-        manipList.appendChild(div);
+    document.getElementById('manipSearchInput').addEventListener('input', (e) => {
+        const texto = e.target.value.toLowerCase();
+        const filtrado = manipulacionesData.filter(m => m.codigo.toLowerCase().includes(texto));
+        renderManipList(filtrado);
     });
-}
-
-document.getElementById('manipSearchInput').addEventListener('input', (e) => {
-    const texto = e.target.value.toLowerCase();
-    const filtrado = manipulacionesData.filter(m => m.codigo.toLowerCase().includes(texto));
-    renderManipList(filtrado);
-});
 
     function seleccionarManipulacion(codigo, recordatorio) {
         manipulacionPendienteSeleccion = codigo;
@@ -337,17 +337,17 @@ document.getElementById('manipSearchInput').addEventListener('input', (e) => {
             inputField.disabled = false;
             inputField.focus();
             btn.textContent = 'Iniciar Descanso';
-            finalizarSesionActual().then(() => iniciarSesion('DESCANSO'));
+            finalizarSesionActual().then(() => iniciarSesion(manipulacionActual));
             btn.style.background = '#5c6673';
             actualizarProductividad();
         }
     }
 
     function cambiarOperario() {
-        finalizarSesionActual();
         if (confirm("¿Seguro que deseas finalizar la sesión de este operario?")) {
+            finalizarSesionActual();
             location.reload();
-                   }
+        }
     }
 
     // Mantener el foco en el campo de lectura de bultos
@@ -378,41 +378,41 @@ document.getElementById('manipSearchInput').addEventListener('input', (e) => {
     }, true);
 
     // Filtro estricto para ignorar comandos extra de la pistola al leer el bulto
-inputField.addEventListener('keydown', async function(event) {
-    if (event.key.startsWith('F') && event.key.length > 1) { event.preventDefault(); return; }
+    inputField.addEventListener('keydown', async function(event) {
+        if (event.key.startsWith('F') && event.key.length > 1) { event.preventDefault(); return; }
 
-    if (event.key === 'Enter') {
-        event.preventDefault();
-        const codigo = inputField.value.trim();
-        if (!codigo) return;
-        inputField.value = '';
-        alertBox.style.display = 'none';
-        successBox.style.display = 'none';
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const codigo = inputField.value.trim();
+            if (!codigo) return;
+            inputField.value = '';
+            alertBox.style.display = 'none';
+            successBox.style.display = 'none';
 
-        try {
-            const resp = await fetch(FLOW_URL_COMPROBAR, {
-                method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ codigo })
-            });
-            const data = await resp.json();
-            if (data.existe) {
-                alertBox.textContent = "¡ALERTA! Este bulto ya ha sido escaneado.";
-                alertBox.style.display = 'block';
-                playBeep(150);
-                return;
+            try {
+                const resp = await fetch(FLOW_URL_COMPROBAR, {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ codigo })
+                });
+                const data = await resp.json();
+                if (data.existe) {
+                    alertBox.textContent = "Este bulto ya ha sido registrado.";
+                    alertBox.style.display = 'block';
+                    playBeep(150);
+                    return;
+                }
+            } catch (e) {
+                // si falla la comprobación previa, seguimos igualmente; el guardado final es quien de verdad protege
             }
-        } catch (e) {
-            // si falla la comprobación previa, seguimos igualmente; el guardado final es quien de verdad protege
-        }
 
-        codigoPendiente = codigo;
-        lblCodigoActual.textContent = codigo;
-        divEscaneo.style.display = 'none';
-        divPrendas.style.display = 'block';
-        prendasInput.value = '';
-        prendasInput.focus();
-    }
-});
+            codigoPendiente = codigo;
+            lblCodigoActual.textContent = codigo;
+            divEscaneo.style.display = 'none';
+            divPrendas.style.display = 'block';
+            prendasInput.value = '';
+            prendasInput.focus();
+        }
+    });
 
     prendasInput.addEventListener('keydown', function(event) {
         if (event.key === 'Enter') {
@@ -443,15 +443,15 @@ inputField.addEventListener('keydown', async function(event) {
             });
 
             if (response.status === 409) {
-                // Duplicado detectado en el servidor (mismo operario, mismo bulto, mismo día natural)
-                alertBox.textContent = "¡ALERTA! Este bulto ya ha sido registrado.";
+                // Duplicado detectado en el servidor
+                alertBox.textContent = "Este bulto ya ha sido registrado.";
                 alertBox.style.display = 'block';
                 playBeep(150);
             } else if (response.ok) {
                 bultosSesion.add(codigoPendiente);
                 totalBultos++;
                 totalPrendasGlobal += parseFloat(numPrendas) || 0;
-                document.getElementById('prendasCounter').textContent = `Prendas: ${totalPrendasGlobal}`;`
+                prendasCounter.textContent = `Prendas: ${totalPrendasGlobal}`;
 
                 const prendasNum = parseFloat(numPrendas) || 0;
                 prendasManipulacion += prendasNum;
@@ -459,7 +459,7 @@ inputField.addEventListener('keydown', async function(event) {
 
                 agregarFilaHistorial(codigoPendiente, numPrendas);
 
-                bottomCounter.textContent = `Bultos: ${totalBultos}`;`
+                bottomCounter.textContent = `Bultos: ${totalBultos}`;
                 successBox.style.display = 'block';
                 playBeep(600);
             } else {
@@ -480,29 +480,24 @@ inputField.addEventListener('keydown', async function(event) {
         return `${codigo} (<span class="prendas-editable" title="Tocar para editar">${texto}</span> prendas) - [Guardado]`;
     }
 
-    function engancharClickPrendas(li, infoSpan) {
+    function engancharClickPrendas(contenedor, infoSpan) {
         const span = infoSpan.querySelector('.prendas-editable');
-        if (span) span.addEventListener('click', () => iniciarEdicionPrendas(li, infoSpan));
+        if (span) span.addEventListener('click', () => iniciarEdicionPrendas(contenedor, infoSpan));
     }
 
+    // Solo se muestra y se puede editar el ÚLTIMO bulto guardado
     function agregarFilaHistorial(codigo, prendas) {
-        const li = document.createElement('li');
-        li.dataset.codigo = codigo;
-        li.dataset.prendas = prendas || '';
-
-        const infoSpan = document.createElement('span');
-        infoSpan.className = 'info';
-        infoSpan.innerHTML = renderInfoHtml(codigo, prendas);
-        li.appendChild(infoSpan);
-
-        listaBultos.prepend(li);
-        engancharClickPrendas(li, infoSpan);
+        ultimoBultoBox.style.display = 'block';
+        ultimoBultoBox.dataset.codigo = codigo;
+        ultimoBultoBox.dataset.prendas = prendas || '';
+        ultimoBultoInfo.innerHTML = renderInfoHtml(codigo, prendas);
+        engancharClickPrendas(ultimoBultoBox, ultimoBultoInfo);
     }
 
-    // Edición en línea: al tocar el número de prendas de un bulto ya guardado
-    function iniciarEdicionPrendas(li, infoSpan) {
-        const codigo = li.dataset.codigo;
-        const prendasActuales = li.dataset.prendas || '';
+    // Edición en línea: al tocar el número de prendas del último bulto guardado
+    function iniciarEdicionPrendas(contenedor, infoSpan) {
+        const codigo = contenedor.dataset.codigo;
+        const prendasActuales = contenedor.dataset.prendas || '';
 
         infoSpan.innerHTML = '';
         infoSpan.appendChild(document.createTextNode(codigo + ' ('));
@@ -521,13 +516,13 @@ inputField.addEventListener('keydown', async function(event) {
         const confirmarBtn = document.createElement('button');
         confirmarBtn.textContent = 'OK';
         confirmarBtn.style.cssText = 'padding:4px 10px; font-size:13px; cursor:pointer;';
-        confirmarBtn.onclick = () => guardarEdicionPrendas(li, infoSpan, input.value);
+        confirmarBtn.onclick = () => guardarEdicionPrendas(contenedor, infoSpan, input.value);
         infoSpan.appendChild(confirmarBtn);
 
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                guardarEdicionPrendas(li, infoSpan, input.value);
+                guardarEdicionPrendas(contenedor, infoSpan, input.value);
             }
         });
 
@@ -535,9 +530,9 @@ inputField.addEventListener('keydown', async function(event) {
         input.select();
     }
 
-    async function guardarEdicionPrendas(li, infoSpan, nuevoValor) {
-        const codigo = li.dataset.codigo;
-        const valorAnterior = parseFloat(li.dataset.prendas) || 0;
+    async function guardarEdicionPrendas(contenedor, infoSpan, nuevoValor) {
+        const codigo = contenedor.dataset.codigo;
+        const valorAnterior = parseFloat(contenedor.dataset.prendas) || 0;
 
         try {
             const response = await fetch(FLOW_URL_EDITAR, {
@@ -560,17 +555,17 @@ inputField.addEventListener('keydown', async function(event) {
             const valorNuevo = parseFloat(nuevoValor) || 0;
             prendasManipulacion += (valorNuevo - valorAnterior);
             totalPrendasGlobal += (valorNuevo - valorAnterior);
-            document.getElementById('prendasCounter').textContent = `Prendas: ${totalPrendasGlobal}`;`
+            prendasCounter.textContent = `Prendas: ${totalPrendasGlobal}`;
             actualizarProductividad();
 
-            li.dataset.prendas = nuevoValor || '';
+            contenedor.dataset.prendas = nuevoValor || '';
             infoSpan.innerHTML = renderInfoHtml(codigo, nuevoValor);
-            engancharClickPrendas(li, infoSpan);
+            engancharClickPrendas(contenedor, infoSpan);
             playBeep(600);
         } catch (error) {
             alert("No se pudo actualizar: " + error.message);
-            infoSpan.innerHTML = renderInfoHtml(codigo, li.dataset.prendas);
-            engancharClickPrendas(li, infoSpan);
+            infoSpan.innerHTML = renderInfoHtml(codigo, contenedor.dataset.prendas);
+            engancharClickPrendas(contenedor, infoSpan);
         }
     }
 
