@@ -322,26 +322,27 @@
     }
 
     function toggleDescanso() {
-    const btn = document.getElementById('descansoBtn');
-    if (!enDescanso) {
-        enDescanso = true;
-        pausaInicioTs = Date.now();
-        inputField.disabled = true;
-        btn.textContent = 'Reanudar (en descanso)';
-        finalizarSesionActual().then(() => iniciarSesion('DESCANSO'));
-        btn.style.background = '#ffaa44';
-    } else {
-        enDescanso = false;
-        pausaAcumuladaMs += (Date.now() - pausaInicioTs);
-        pausaInicioTs = null;
-        inputField.disabled = false;
-        inputField.focus();
-        btn.textContent = 'Iniciar Descanso';
-        finalizarSesionActual().then(() => iniciarSesion(manipulacionActual));
-        btn.style.background = '#5c6673';
-        actualizarProductividad();
+        const btn = document.getElementById('descansoBtn');
+        if (!enDescanso) {
+            enDescanso = true;
+            pausaInicioTs = Date.now();
+            inputField.disabled = true;
+            btn.textContent = 'Reanudar (en descanso)';
+            finalizarSesionActual().then(() => iniciarSesion('DESCANSO'));
+            btn.style.background = '#ffaa44';
+        } else {
+            enDescanso = false;
+            pausaAcumuladaMs += (Date.now() - pausaInicioTs);
+            pausaInicioTs = null;
+            inputField.disabled = false;
+            inputField.focus();
+            btn.textContent = 'Iniciar Descanso';
+            finalizarSesionActual().then(() => iniciarSesion(manipulacionActual));
+            btn.style.background = '#5c6673';
+            actualizarProductividad();
+        }
     }
-}
+
     function cambiarOperario() {
         if (confirm("¿Seguro que deseas finalizar la sesión de este operario?")) {
             finalizarSesionActual();
@@ -351,11 +352,11 @@
 
     // Mantener el foco en el campo de lectura de bultos
     document.addEventListener('click', (e) => {
-    if (e.target.closest && e.target.closest('#ultimoBultoBox')) return; // no interferir en la edición de prendas
-    if (scannerSection.style.display !== 'none' && divPrendas.style.display === 'none') {
-        inputField.focus();
-    }
-});
+        if (e.target.closest && e.target.closest('#ultimoBultoBox')) return; // no interferir en la edición de prendas
+        if (scannerSection.style.display !== 'none' && divPrendas.style.display === 'none') {
+            inputField.focus();
+        }
+    });
 
     // Guardián: fuerza el foco al campo correcto antes de que cualquier tecla
     // (incluida una perdida de la pistola) pueda llegar a otro elemento
@@ -388,6 +389,13 @@
             inputField.value = '';
             alertBox.style.display = 'none';
             successBox.style.display = 'none';
+
+            if (!/^\d{19}$/.test(codigo)) {
+                alertBox.textContent = "Código no válido: debe tener 19 dígitos.";
+                alertBox.style.display = 'block';
+                playBeep(150);
+                return;
+            }
 
             try {
                 const resp = await fetch(FLOW_URL_COMPROBAR, {
