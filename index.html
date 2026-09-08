@@ -673,19 +673,7 @@
             setTimeout(() => osc.stop(), 150);
         } catch(e) {}
     }
-           // --- FILTRO DE ENTRADA HONEYWELL ---
-    const codeinput Honeywell = document.getElementById('codeinput');
-    if (codeHoneywell) {
-        codeHoneywell.addEventListener('keydown', function(evento) {
-            if (evento.key === 'Enter' || evento.keyCode === 13) {
-                // 1. Limpiamos cualquier espacio o carácter invisible que la pistola añada al final
-                this.value = this.value.trim(); 
-                
-                // 2. Dejamos que tu aplicación continúe su curso normal con los 19 dígitos limpios
-            }
-        });
-    }
-    // --- FIN FILTRO ---
+ --
 
 </script>
 
