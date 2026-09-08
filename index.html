@@ -92,8 +92,19 @@
         <div class="productividad" id="productividadBox">Productividad: 0,0 prendas/hora</div>
 
         <button class="btn btn-secundario" style="margin-top:15px;" onclick="abrirCambioManipulacion()">Cambiar Manipulación</button>
+        <button class="btn" style="margin-top:8px; background:#6f42c1;" onclick="abrirCalidad()">Calidad (comprobar bulto)</button>
         <button class="btn" id="descansoBtn" style="margin-top:8px; background:#5c6673;" onclick="toggleDescanso()">Iniciar Descanso</button>
         <button class="btn btn-peligro" style="font-size:14px; padding:8px;" tabindex="-1" onclick="cambiarOperario()">Finalizar / Cambiar Operario</button>
+    </div>
+</div>
+
+<!-- Modal de Calidad: comprobar y corregir prendas de cualquier bulto -->
+<div class="modal-overlay" id="calidadModal">
+    <div class="modal-box">
+        <h3 style="color:#6f42c1;">Calidad: comprobar bulto</h3>
+        <input type="text" id="calidadCodigoInput" placeholder="Escanea el código del bulto..." autocomplete="off" style="margin-bottom:10px;">
+        <div id="calidadResultado" style="font-size:15px; margin-bottom:10px;"></div>
+        <button class="btn btn-secundario" onclick="cerrarCalidad()">Cerrar</button>
     </div>
 </div>
 
@@ -114,6 +125,7 @@
     const FLOW_URL_COMPROBAR = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/6b1a7900cc964c869bd27082251d6fc5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=w_BwywyIB_PROhrkEu1J68h7WaYgY_vfezi4iV5pVKQ";
     const FLOW_URL_SESION_INICIO = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/13/workflows/77e5897eaf494f229bfe0e3494e0c9d3/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=GiL52Ip1FyODK2cefAg0__-Dws2ysXTymNSO5Nx-Odc";
     const FLOW_URL_SESION_FIN = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/16/workflows/d14828a681324753b681a52e4d71e660/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jaqEFLD223k6t2qadslVsEWcFng89wucRxVv9-dsxWQ";
+    const FLOW_URL_DETALLE = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/29/workflows/50ddece195704456b14e66f2ae8e41da/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=nsbxnyd4HWO4ibcWKoyMdjTLIYJBbZd29TbNa8cHcPI";
 
     let sesionActualId = null;
 
@@ -352,7 +364,7 @@
 
     // Mantener el foco en el campo de lectura de bultos
     document.addEventListener('click', (e) => {
-        if (e.target.closest && e.target.closest('#ultimoBultoBox')) return; // no interferir en la edición de prendas
+        if (e.target.closest && (e.target.closest('#ultimoBultoBox') || e.target.closest('#calidadModal'))) return; // no interferir en edición de prendas ni en Calidad
         if (scannerSection.style.display !== 'none' && divPrendas.style.display === 'none') {
             inputField.focus();
         }
@@ -362,7 +374,7 @@
     // (incluida una perdida de la pistola) pueda llegar a otro elemento
     document.addEventListener('keydown', function(e) {
         if (enDescanso) return; // en descanso no se fuerza el foco al escáner
-        if (document.activeElement && document.activeElement.id === 'inputEdicionPrendas') return; // no interferir mientras se edita el bulto guardado
+        if (document.activeElement && (document.activeElement.id === 'inputEdicionPrendas' || document.activeElement.id === 'calidadCodigoInput' || document.activeElement.id === 'calidadPrendasInput')) return; // no interferir mientras se edita o se usa Calidad
         let campoCorrecto;
         if (setupBox.style.display !== 'none') {
             campoCorrecto = operarioInput;
@@ -574,6 +586,78 @@
             alert("No se pudo actualizar: " + error.message);
             infoSpan.innerHTML = renderInfoHtml(codigo, contenedor.dataset.prendas);
             engancharClickPrendas(contenedor, infoSpan);
+        }
+    }
+
+    // ---------- Calidad: comprobar y corregir prendas de cualquier bulto ----------
+
+    function abrirCalidad() {
+        document.getElementById('calidadCodigoInput').value = '';
+        document.getElementById('calidadResultado').innerHTML = '';
+        document.getElementById('calidadModal').style.display = 'flex';
+        setTimeout(() => document.getElementById('calidadCodigoInput').focus(), 50);
+    }
+
+    function cerrarCalidad() {
+        document.getElementById('calidadModal').style.display = 'none';
+        inputField.focus();
+    }
+
+    document.getElementById('calidadCodigoInput').addEventListener('keydown', async function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const codigo = this.value.trim();
+            if (!codigo) return;
+            const resultadoBox = document.getElementById('calidadResultado');
+            resultadoBox.innerHTML = 'Buscando...';
+            try {
+                const resp = await fetch(FLOW_URL_DETALLE, {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ codigo })
+                });
+                const data = await resp.json();
+                if (!data.encontrado) {
+                    resultadoBox.innerHTML = '<span style="color:#a80000;">Bulto no encontrado.</span>';
+                    return;
+                }
+                mostrarResultadoCalidad(codigo, data);
+            } catch (e) {
+                resultadoBox.innerHTML = '<span style="color:#a80000;">Error al consultar: ' + e.message + '</span>';
+            }
+        }
+    });
+
+    function mostrarResultadoCalidad(codigo, data) {
+        const resultadoBox = document.getElementById('calidadResultado');
+        resultadoBox.innerHTML = `
+            <div><strong>Código:</strong> ${codigo}</div>
+            <div><strong>Operario:</strong> ${data.operario || '-'}</div>
+            <div><strong>Manipulación:</strong> ${data.manipulacion || '-'}</div>
+            <div><strong>Fecha:</strong> ${data.fecha || '-'}</div>
+            <div style="margin-top:8px;"><strong>Prendas:</strong>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="calidadPrendasInput" value="${data.prendas || ''}" style="width:70px; padding:4px; font-size:14px; margin-left:6px;">
+                <button id="calidadGuardarBtn" style="padding:4px 10px; font-size:13px; cursor:pointer; margin-left:6px;">Guardar</button>
+            </div>
+        `;
+        document.getElementById('calidadGuardarBtn').onclick = () => guardarPrendasCalidad(codigo);
+        document.getElementById('calidadPrendasInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); guardarPrendasCalidad(codigo); }
+        });
+        document.getElementById('calidadPrendasInput').focus();
+    }
+
+    async function guardarPrendasCalidad(codigo) {
+        const nuevoValor = document.getElementById('calidadPrendasInput').value;
+        try {
+            const response = await fetch(FLOW_URL_EDITAR, {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ operario: operarioActual, codigo: codigo, fecha: new Date().toISOString(), prendas: nuevoValor })
+            });
+            if (!response.ok) throw new Error(`Código ${response.status}`);
+            document.getElementById('calidadResultado').innerHTML += '<div style="color:#107c10; margin-top:6px;">Actualizado correctamente.</div>';
+            playBeep(600);
+        } catch (error) {
+            alert("No se pudo actualizar: " + error.message);
         }
     }
 
