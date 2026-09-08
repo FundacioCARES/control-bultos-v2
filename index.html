@@ -673,42 +673,19 @@
             setTimeout(() => osc.stop(), 150);
         } catch(e) {}
     }
-        // --- SOLUCIÓN AUTOENTER HONEYWELL ---
-    document.getElementById('codeinput')?.addEventListener('keydown', function(evento) {
-        if (evento.key === 'Enter' || evento.keyCode === 13) {
-            evento.preventDefault();
-            const codigo = this.value.trim();
-            if (codigo !== "") {
-                const lblCodigoActual = document.getElementById('lblCodigoActual');
-                const divEscaneo = document.getElementById('divEscaneo');
-                const divPrendas = document.getElementById('divPrendas');
-                const prendasInput = document.getElementById('prendasInput');
-                if (lblCodigoActual && divEscaneo && divPrendas) {
-                    lblCodigoActual.innerText = codigo;
-                    divEscaneo.style.display = 'none';
-                    divPrendas.style.display = 'block';
-                    setTimeout(() => prendasInput?.focus(), 50);
-                }
+           // --- FILTRO DE ENTRADA HONEYWELL ---
+    const codeinput Honeywell = document.getElementById('codeinput');
+    if (codeHoneywell) {
+        codeHoneywell.addEventListener('keydown', function(evento) {
+            if (evento.key === 'Enter' || evento.keyCode === 13) {
+                // 1. Limpiamos cualquier espacio o carácter invisible que la pistola añada al final
+                this.value = this.value.trim(); 
+                
+                // 2. Dejamos que tu aplicación continúe su curso normal con los 19 dígitos limpios
             }
-        }
-    });
-
-    document.getElementById('operarioInput')?.addEventListener('keydown', function(evento) {
-        if (evento.key === 'Enter' || evento.keyCode === 13) {
-            evento.preventDefault();
-            if (this.value.trim() !== "") guardarOperario();
-        }
-    });
-
-    document.getElementById('calidadCodigoInput')?.addEventListener('keydown', function(evento) {
-        if (evento.key === 'Enter' || evento.keyCode === 13) {
-            evento.preventDefault();
-            if (this.value.trim() !== "" && typeof consultarBultoCalidad === "function") {
-                consultarBultoCalidad(this.value.trim());
-            }
-        }
-    });
-    // --- FIN SOLUCIÓN HONEYWELL ---
+        });
+    }
+    // --- FIN FILTRO ---
 
 </script>
 
