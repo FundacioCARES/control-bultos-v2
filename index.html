@@ -73,7 +73,7 @@
 
         <div id="divPrendas" class="prendas-box">
             <h3 style="margin-top:0; color:#333;">Bulto leído: <span id="lblCodigoActual" style="color:#0078d4;"></span></h3>
-            <div id="cajaMediasBox" style="display:none; text-align:left; margin:10px 0;">
+            <div id="cajaMediasBox" style="text-align:left; margin:10px 0;">
                 <label style="display:flex; align-items:center; gap:8px; font-size:15px;">
                     <input type="checkbox" id="cajaMediasCheckbox" style="width:20px; height:20px;">
                     Caja a medias
@@ -99,9 +99,8 @@
         <div class="productividad" id="productividadBox">Productividad: 0,0 prendas/hora</div>
 
         <button class="btn btn-secundario" style="margin-top:15px;" onclick="abrirCambioManipulacion()">Cambiar Manipulación</button>
-        <button class="btn" style="margin-top:8px; background:#6f42c1;" onclick="abrirCalidad()">Calidad (comprobar bulto)</button>
         <button class="btn" id="descansoBtn" style="margin-top:8px; background:#5c6673;" onclick="toggleDescanso()">Iniciar Descanso</button>
-        <button class="btn btn-peligro" style="font-size:14px; padding:8px;" tabindex="-1" onclick="cambiarOperario()">Finalizar / Cambiar Operario</button>
+        <button class="btn btn-peligro" tabindex="-1" onclick="cambiarOperario()">Finalizar / Cambiar Operario</button>
     </div>
 </div>
 
@@ -433,8 +432,8 @@
 
             cajaMediasExistente = false;
             prendasExistentesCajaMedias = 0;
-            const cajaMediasBox = document.getElementById('cajaMediasBox');
             const cajaMediasCheckboxEl = document.getElementById('cajaMediasCheckbox');
+            cajaMediasCheckboxEl.checked = false;
 
             if (detalle && detalle.encontrado) {
                 if (detalle.operario === operarioActual) {
@@ -445,11 +444,6 @@
                 }
                 cajaMediasExistente = true;
                 prendasExistentesCajaMedias = parseFloat(detalle.prendas) || 0;
-                cajaMediasBox.style.display = 'block';
-                cajaMediasCheckboxEl.checked = false;
-            } else {
-                cajaMediasBox.style.display = 'none';
-                cajaMediasCheckboxEl.checked = false;
             }
 
             codigoPendiente = codigo;
@@ -581,7 +575,6 @@
             playBeep(100);
         }
 
-        document.getElementById('cajaMediasBox').style.display = 'none';
         document.getElementById('cajaMediasCheckbox').checked = false;
         cajaMediasExistente = false;
         prendasExistentesCajaMedias = 0;
@@ -725,6 +718,7 @@
             const resultadoBox = document.getElementById('calidadResultado');
             resultadoBox.innerHTML = 'Buscando...';
             try {
+                await asegurarManipulacionesCargadas();
                 const resp = await fetch(FLOW_URL_DETALLE, {
                     method: 'POST', headers: {'Content-Type':'application/json'},
                     body: JSON.stringify({ codigo })
@@ -738,18 +732,24 @@
             } catch (e) {
                 resultadoBox.innerHTML = '<span style="color:#a80000;">Error al consultar: ' + e.message + '</span>';
             }
-            this.focus();
+            setTimeout(() => this.focus(), 50);
         }
     });
 
     function mostrarResultadoCalidad(codigo, data) {
         const resultadoBox = document.getElementById('calidadResultado');
+        const opciones = manipulacionesData.map(m =>
+            `<option value="${m.codigo}" ${m.codigo === data.manipulacion ? 'selected' : ''}>${m.codigo}</option>`
+        ).join('');
         resultadoBox.innerHTML = `
             <div><strong>Código:</strong> ${codigo}</div>
             <div><strong>Operario:</strong> ${data.operario || '-'}</div>
             <div><strong>Fecha:</strong> ${data.fecha || '-'}</div>
             <div style="margin-top:8px;"><strong>Manipulación:</strong><br>
-                <input type="text" id="calidadManipInput" value="${data.manipulacion || ''}" style="width:100%; padding:6px; font-size:14px; margin-top:4px; box-sizing:border-box;">
+                <select id="calidadManipInput" style="width:100%; padding:6px; font-size:14px; margin-top:4px; box-sizing:border-box;">
+                    <option value="">-- Selecciona --</option>
+                    ${opciones}
+                </select>
             </div>
             <div style="margin-top:8px;"><strong>Prendas:</strong>
                 <input type="text" inputmode="numeric" pattern="[0-9]*" id="calidadPrendasInput" value="${data.prendas || ''}" style="width:80px; padding:6px; font-size:14px; margin-left:6px;">
