@@ -49,7 +49,7 @@
         <label for="operarioInput"><strong>Identifícate para empezar:</strong></label><br>
         <input type="text" id="operarioInput" placeholder="Escanea o escribe tu ID de Operario..." autocomplete="off">
         <button class="btn" onclick="guardarOperario()">Comenzar Turno</button>
-        <button class="btn" style="margin-top:8px; background:#6f42c1;" onclick="abrirCalidad()">Calidad (sin identificarte)</button>
+        <button class="btn" style="margin-top:8px; background:#6f42c1;" onclick="abrirCalidad()">Calidad</button>
     </div>
 
     <!-- Paso 2: Selección de manipulación (inicial o por cambio) -->
@@ -68,15 +68,17 @@
         <div class="manip-actual">Manipulación actual: <strong id="lblManipulacionActual">-</strong></div>
 
         <div id="divEscaneo">
-            <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:15px; text-align:left;">
-                <input type="checkbox" id="cajaMediasCheckbox" style="width:20px; height:20px;">
-                Caja a medias (permite repetir bulto si lo escanea otro operario)
-            </label>
             <input type="text" id="codeinput" placeholder="Dispara aquí el bulto..." autocomplete="off">
         </div>
 
         <div id="divPrendas" class="prendas-box">
             <h3 style="margin-top:0; color:#333;">Bulto leído: <span id="lblCodigoActual" style="color:#0078d4;"></span></h3>
+            <div id="cajaMediasBox" style="display:none; text-align:left; margin:10px 0;">
+                <label style="display:flex; align-items:center; gap:8px; font-size:15px;">
+                    <input type="checkbox" id="cajaMediasCheckbox" style="width:20px; height:20px;">
+                    Caja a medias
+                </label>
+            </div>
             <label for="prendasInput"><strong>Número de prendas (Opcional):</strong></label><br>
             <input type="number" id="prendasInput" placeholder="Dejar en blanco si no aplica..." min="1" autocomplete="off">
             <button class="btn" style="background:#107c10;" onclick="enviarDatos(prendasInput.value)">Guardar Bulto</button>
@@ -130,7 +132,7 @@
     const FLOW_URL_COMPROBAR = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/20/workflows/6b1a7900cc964c869bd27082251d6fc5/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=w_BwywyIB_PROhrkEu1J68h7WaYgY_vfezi4iV5pVKQ";
     const FLOW_URL_SESION_INICIO = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/13/workflows/77e5897eaf494f229bfe0e3494e0c9d3/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=GiL52Ip1FyODK2cefAg0__-Dws2ysXTymNSO5Nx-Odc";
     const FLOW_URL_SESION_FIN = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/16/workflows/d14828a681324753b681a52e4d71e660/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jaqEFLD223k6t2qadslVsEWcFng89wucRxVv9-dsxWQ";
-    const FLOW_URL_DETALLE = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/29/workflows/50ddece195704456b14e66f2ae8e41da/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=nsbxnyd4HWO4ibcWKoyMdjTLIYJBbZd29TbNa8cHcPI";
+    const FLOW_URL_DETALLE = "https://TU_FLUJO_OBTENER_DETALLE_BULTO_AQUI";
 
     let sesionActualId = null;
 
@@ -193,7 +195,6 @@
     const divPrendas = document.getElementById('divPrendas');
     const lblCodigoActual = document.getElementById('lblCodigoActual');
     const prendasInput = document.getElementById('prendasInput');
-    const cajaMediasCheckbox = document.getElementById('cajaMediasCheckbox');
     const ultimoBultoBox = document.getElementById('ultimoBultoBox');
     const ultimoBultoInfo = document.getElementById('ultimoBultoInfo');
     const bottomCounter = document.getElementById('bottomCounter');
@@ -318,7 +319,6 @@
         scannerSection.style.display = 'block';
         divEscaneo.style.display = 'block';
         divPrendas.style.display = 'none';
-        cajaMediasCheckbox.checked = false;
         inputField.focus();
     }
 
@@ -420,53 +420,36 @@
                 return;
             }
 
-            if (cajaMediasCheckbox.checked) {
-                // Modo caja a medias: se permite repetir el bulto si lo escanea OTRO operario
-                let detalle = null;
-                try {
-                    const resp = await fetch(FLOW_URL_DETALLE, {
-                        method: 'POST', headers: {'Content-Type':'application/json'},
-                        body: JSON.stringify({ codigo })
-                    });
-                    detalle = await resp.json();
-                } catch (e) {
-                    alertBox.textContent = "No se pudo comprobar el bulto. Inténtalo de nuevo.";
+            let detalle = null;
+            try {
+                const resp = await fetch(FLOW_URL_DETALLE, {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ codigo })
+                });
+                detalle = await resp.json();
+            } catch (e) {
+                // si falla la comprobación previa, seguimos igualmente; el guardado final es quien de verdad protege
+            }
+
+            cajaMediasExistente = false;
+            prendasExistentesCajaMedias = 0;
+            const cajaMediasBox = document.getElementById('cajaMediasBox');
+            const cajaMediasCheckboxEl = document.getElementById('cajaMediasCheckbox');
+
+            if (detalle && detalle.encontrado) {
+                if (detalle.operario === operarioActual) {
+                    alertBox.textContent = "Este bulto ya ha sido registrado.";
                     alertBox.style.display = 'block';
                     playBeep(150);
                     return;
                 }
-
-                if (detalle.encontrado) {
-                    if (detalle.operario === operarioActual) {
-                        alertBox.textContent = "Este bulto ya lo escaneaste tú. Debe escanearlo otro operario para caja a medias.";
-                        alertBox.style.display = 'block';
-                        playBeep(150);
-                        return;
-                    }
-                    cajaMediasExistente = true;
-                    prendasExistentesCajaMedias = parseFloat(detalle.prendas) || 0;
-                } else {
-                    cajaMediasExistente = false;
-                    prendasExistentesCajaMedias = 0;
-                }
+                cajaMediasExistente = true;
+                prendasExistentesCajaMedias = parseFloat(detalle.prendas) || 0;
+                cajaMediasBox.style.display = 'block';
+                cajaMediasCheckboxEl.checked = false;
             } else {
-                cajaMediasExistente = false;
-                prendasExistentesCajaMedias = 0;
-                try {
-                    const resp = await fetch(FLOW_URL_COMPROBAR, {
-                        method: 'POST', headers: {'Content-Type':'application/json'},
-                        body: JSON.stringify({ codigo })
-                    });
-                    const data = await resp.json();
-                    if (data.existe) {
-                        alertBox.textContent = "Este bulto ya ha sido registrado.";
-                        alertBox.style.display = 'block';
-                        playBeep(150);
-                        return;
-                    }
-                } catch (e) {
-                    // si falla la comprobación previa, seguimos igualmente; el guardado final es quien de verdad protege
-                }
+                cajaMediasBox.style.display = 'none';
+                cajaMediasCheckboxEl.checked = false;
             }
 
             codigoPendiente = codigo;
@@ -487,6 +470,19 @@
 
     async function enviarDatos(numPrendas) {
         if (cajaMediasExistente) {
+            const cajaMediasCheckboxEl = document.getElementById('cajaMediasCheckbox');
+            if (!cajaMediasCheckboxEl.checked) {
+                divPrendas.style.display = 'none';
+                divEscaneo.style.display = 'block';
+                alertBox.textContent = "Este bulto ya ha sido registrado.";
+                alertBox.style.display = 'block';
+                playBeep(150);
+                cajaMediasExistente = false;
+                prendasExistentesCajaMedias = 0;
+                codigoPendiente = "";
+                inputField.focus();
+                return;
+            }
             await enviarDatosCajaMedias(numPrendas);
             return;
         }
@@ -561,7 +557,7 @@
                     operario: operarioActual,
                     codigo: codigoPendiente,
                     fecha: new Date().toISOString(),
-                    prendas: totalPrendasBulto
+                    prendas: String(totalPrendasBulto)
                 })
             });
             if (!response.ok) throw new Error(`Código ${response.status}`);
@@ -585,6 +581,8 @@
             playBeep(100);
         }
 
+        document.getElementById('cajaMediasBox').style.display = 'none';
+        document.getElementById('cajaMediasCheckbox').checked = false;
         cajaMediasExistente = false;
         prendasExistentesCajaMedias = 0;
         codigoPendiente = "";
@@ -696,7 +694,26 @@
 
     function cerrarCalidad() {
         document.getElementById('calidadModal').style.display = 'none';
-        inputField.focus();
+        if (operarioActual) {
+            inputField.focus();
+        } else {
+            operarioInput.focus();
+        }
+    }
+
+    async function asegurarManipulacionesCargadas() {
+        if (manipulacionesData.length > 0) return;
+        try {
+            const response = await fetch(FLOW_URL_MANIPULACIONES, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const data = await response.json();
+            if (Array.isArray(data)) manipulacionesData = data;
+        } catch (e) {
+            // si falla, el desplegable de Calidad saldrá vacío; se puede reintentar en el siguiente escaneo
+        }
     }
 
     document.getElementById('calidadCodigoInput').addEventListener('keydown', async function(event) {
