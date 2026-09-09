@@ -16,8 +16,8 @@
         .manip-item { padding: 12px 14px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 16px; }
         .manip-item:last-child { border-bottom: none; }
         .manip-item:hover, .manip-item:active { background: #f0f6fc; }
-        .counter { font-size: 20px; font-weight: bold; text-align: center; margin: 15px 0; color: #0078d4; }
-        .manip-actual { text-align: center; font-size: 14px; color: #555; margin-top: -10px; margin-bottom: 10px; }
+        .counter { font-size: 26px; font-weight: bold; text-align: center; margin: 15px 0; color: #0078d4; }
+        .manip-actual { text-align: center; font-size: 20px; font-weight: 700; color: #333; margin-top: -8px; margin-bottom: 12px; }
         .bottom-counter { background-color: #f0f6fc; border: 2px solid #0078d4; color: #005a9e; padding: 12px; font-size: 20px; font-weight: bold; text-align: center; border-radius: 6px; margin-top: 15px; }
         .productividad { background-color: #eaf7ea; border: 2px solid #107c10; color: #0b5c0b; padding: 10px; font-size: 16px; font-weight: bold; text-align: center; border-radius: 6px; margin-top: 8px; }
         input[type="text"], input[type="number"] { width: 100%; padding: 15px; font-size: 18px; box-sizing: border-box; border: 2px solid #ccc; border-radius: 4px; outline: none; margin-top: 5px; }
@@ -49,6 +49,7 @@
         <label for="operarioInput"><strong>Identifícate para empezar:</strong></label><br>
         <input type="text" id="operarioInput" placeholder="Escanea o escribe tu ID de Operario..." autocomplete="off">
         <button class="btn" onclick="guardarOperario()">Comenzar Turno</button>
+        <button class="btn" style="margin-top:8px; background:#6f42c1;" onclick="abrirCalidad()">Calidad (sin identificarte)</button>
     </div>
 
     <!-- Paso 2: Selección de manipulación (inicial o por cambio) -->
@@ -67,6 +68,10 @@
         <div class="manip-actual">Manipulación actual: <strong id="lblManipulacionActual">-</strong></div>
 
         <div id="divEscaneo">
+            <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:15px; text-align:left;">
+                <input type="checkbox" id="cajaMediasCheckbox" style="width:20px; height:20px;">
+                Caja a medias (permite repetir bulto si lo escanea otro operario)
+            </label>
             <input type="text" id="codeinput" placeholder="Dispara aquí el bulto..." autocomplete="off">
         </div>
 
@@ -171,6 +176,10 @@
     let pausaInicioTs = null;
     let pausaAcumuladaMs = 0;
 
+    // Caja a medias: permite repetir un bulto ya existente si lo escanea otro operario, sumando prendas
+    let cajaMediasExistente = false;
+    let prendasExistentesCajaMedias = 0;
+
     const setupBox = document.getElementById('setupBox');
     const manipBox = document.getElementById('manipBox');
     const manipList = document.getElementById('manipList');
@@ -184,6 +193,7 @@
     const divPrendas = document.getElementById('divPrendas');
     const lblCodigoActual = document.getElementById('lblCodigoActual');
     const prendasInput = document.getElementById('prendasInput');
+    const cajaMediasCheckbox = document.getElementById('cajaMediasCheckbox');
     const ultimoBultoBox = document.getElementById('ultimoBultoBox');
     const ultimoBultoInfo = document.getElementById('ultimoBultoInfo');
     const bottomCounter = document.getElementById('bottomCounter');
@@ -308,6 +318,7 @@
         scannerSection.style.display = 'block';
         divEscaneo.style.display = 'block';
         divPrendas.style.display = 'none';
+        cajaMediasCheckbox.checked = false;
         inputField.focus();
     }
 
@@ -374,7 +385,7 @@
     // (incluida una perdida de la pistola) pueda llegar a otro elemento
     document.addEventListener('keydown', function(e) {
         if (enDescanso) return; // en descanso no se fuerza el foco al escáner
-        if (document.activeElement && (document.activeElement.id === 'inputEdicionPrendas' || document.activeElement.id === 'calidadCodigoInput' || document.activeElement.id === 'calidadPrendasInput')) return; // no interferir mientras se edita o se usa Calidad
+        if (document.activeElement && ['inputEdicionPrendas', 'calidadCodigoInput', 'calidadManipInput', 'calidadPrendasInput'].includes(document.activeElement.id)) return; // no interferir mientras se edita o se usa Calidad
         let campoCorrecto;
         if (setupBox.style.display !== 'none') {
             campoCorrecto = operarioInput;
@@ -402,27 +413,60 @@
             alertBox.style.display = 'none';
             successBox.style.display = 'none';
 
-            if (!/^\d{20}$/.test(codigo)) {
-                alertBox.textContent = "Código no válido: debe tener 20 dígitos.";
+            if (!/^\d{19}$/.test(codigo)) {
+                alertBox.textContent = "Código no válido: debe tener 19 dígitos.";
                 alertBox.style.display = 'block';
                 playBeep(150);
                 return;
             }
 
-            try {
-                const resp = await fetch(FLOW_URL_COMPROBAR, {
-                    method: 'POST', headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({ codigo })
-                });
-                const data = await resp.json();
-                if (data.existe) {
-                    alertBox.textContent = "Este bulto ya ha sido registrado.";
+            if (cajaMediasCheckbox.checked) {
+                // Modo caja a medias: se permite repetir el bulto si lo escanea OTRO operario
+                let detalle = null;
+                try {
+                    const resp = await fetch(FLOW_URL_DETALLE, {
+                        method: 'POST', headers: {'Content-Type':'application/json'},
+                        body: JSON.stringify({ codigo })
+                    });
+                    detalle = await resp.json();
+                } catch (e) {
+                    alertBox.textContent = "No se pudo comprobar el bulto. Inténtalo de nuevo.";
                     alertBox.style.display = 'block';
                     playBeep(150);
                     return;
                 }
-            } catch (e) {
-                // si falla la comprobación previa, seguimos igualmente; el guardado final es quien de verdad protege
+
+                if (detalle.encontrado) {
+                    if (detalle.operario === operarioActual) {
+                        alertBox.textContent = "Este bulto ya lo escaneaste tú. Debe escanearlo otro operario para caja a medias.";
+                        alertBox.style.display = 'block';
+                        playBeep(150);
+                        return;
+                    }
+                    cajaMediasExistente = true;
+                    prendasExistentesCajaMedias = parseFloat(detalle.prendas) || 0;
+                } else {
+                    cajaMediasExistente = false;
+                    prendasExistentesCajaMedias = 0;
+                }
+            } else {
+                cajaMediasExistente = false;
+                prendasExistentesCajaMedias = 0;
+                try {
+                    const resp = await fetch(FLOW_URL_COMPROBAR, {
+                        method: 'POST', headers: {'Content-Type':'application/json'},
+                        body: JSON.stringify({ codigo })
+                    });
+                    const data = await resp.json();
+                    if (data.existe) {
+                        alertBox.textContent = "Este bulto ya ha sido registrado.";
+                        alertBox.style.display = 'block';
+                        playBeep(150);
+                        return;
+                    }
+                } catch (e) {
+                    // si falla la comprobación previa, seguimos igualmente; el guardado final es quien de verdad protege
+                }
             }
 
             codigoPendiente = codigo;
@@ -442,6 +486,11 @@
     });
 
     async function enviarDatos(numPrendas) {
+        if (cajaMediasExistente) {
+            await enviarDatosCajaMedias(numPrendas);
+            return;
+        }
+
         divPrendas.style.display = 'none';
         divEscaneo.style.display = 'block';
 
@@ -477,6 +526,7 @@
                 prendasManipulacion += prendasNum;
                 actualizarProductividad();
 
+                successBox.textContent = "¡Bulto guardado correctamente en la nube!";
                 agregarFilaHistorial(codigoPendiente, numPrendas);
 
                 bottomCounter.textContent = `Bultos: ${totalBultos}`;
@@ -491,6 +541,52 @@
             playBeep(100);
         }
 
+        codigoPendiente = "";
+        inputField.focus();
+    }
+
+    async function enviarDatosCajaMedias(numPrendas) {
+        divPrendas.style.display = 'none';
+        divEscaneo.style.display = 'block';
+
+        const prendasAnadidas = parseFloat(numPrendas) || 0;
+        const totalPrendasBulto = prendasExistentesCajaMedias + prendasAnadidas;
+
+        try {
+            const response = await fetch(FLOW_URL_EDITAR, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    operario: operarioActual,
+                    codigo: codigoPendiente,
+                    fecha: new Date().toISOString(),
+                    prendas: totalPrendasBulto
+                })
+            });
+            if (!response.ok) throw new Error(`Código ${response.status}`);
+
+            totalBultos++;
+            totalPrendasGlobal += prendasAnadidas;
+            prendasCounter.textContent = `Prendas: ${totalPrendasGlobal}`;
+
+            prendasManipulacion += prendasAnadidas;
+            actualizarProductividad();
+
+            successBox.textContent = `¡Caja a medias actualizada! Ahora tiene ${totalPrendasBulto} prendas en total.`;
+            agregarFilaHistorial(codigoPendiente, totalPrendasBulto);
+
+            bottomCounter.textContent = `Bultos: ${totalBultos}`;
+            successBox.style.display = 'block';
+            playBeep(600);
+        } catch (error) {
+            alertBox.textContent = "Error al guardar en la nube: " + error.message;
+            alertBox.style.display = 'block';
+            playBeep(100);
+        }
+
+        cajaMediasExistente = false;
+        prendasExistentesCajaMedias = 0;
         codigoPendiente = "";
         inputField.focus();
     }
@@ -608,6 +704,7 @@
             event.preventDefault();
             const codigo = this.value.trim();
             if (!codigo) return;
+            this.value = ''; // se vacía para poder escanear el siguiente bulto
             const resultadoBox = document.getElementById('calidadResultado');
             resultadoBox.innerHTML = 'Buscando...';
             try {
@@ -618,12 +715,13 @@
                 const data = await resp.json();
                 if (!data.encontrado) {
                     resultadoBox.innerHTML = '<span style="color:#a80000;">Bulto no encontrado.</span>';
-                    return;
+                } else {
+                    mostrarResultadoCalidad(codigo, data);
                 }
-                mostrarResultadoCalidad(codigo, data);
             } catch (e) {
                 resultadoBox.innerHTML = '<span style="color:#a80000;">Error al consultar: ' + e.message + '</span>';
             }
+            this.focus();
         }
     });
 
@@ -632,30 +730,36 @@
         resultadoBox.innerHTML = `
             <div><strong>Código:</strong> ${codigo}</div>
             <div><strong>Operario:</strong> ${data.operario || '-'}</div>
-            <div><strong>Manipulación:</strong> ${data.manipulacion || '-'}</div>
             <div><strong>Fecha:</strong> ${data.fecha || '-'}</div>
-            <div style="margin-top:8px;"><strong>Prendas:</strong>
-                <input type="text" inputmode="numeric" pattern="[0-9]*" id="calidadPrendasInput" value="${data.prendas || ''}" style="width:70px; padding:4px; font-size:14px; margin-left:6px;">
-                <button id="calidadGuardarBtn" style="padding:4px 10px; font-size:13px; cursor:pointer; margin-left:6px;">Guardar</button>
+            <div style="margin-top:8px;"><strong>Manipulación:</strong><br>
+                <input type="text" id="calidadManipInput" value="${data.manipulacion || ''}" style="width:100%; padding:6px; font-size:14px; margin-top:4px; box-sizing:border-box;">
             </div>
+            <div style="margin-top:8px;"><strong>Prendas:</strong>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="calidadPrendasInput" value="${data.prendas || ''}" style="width:80px; padding:6px; font-size:14px; margin-left:6px;">
+            </div>
+            <button id="calidadGuardarBtn" style="margin-top:10px; padding:8px 16px; font-size:14px; cursor:pointer;">Guardar cambios</button>
         `;
-        document.getElementById('calidadGuardarBtn').onclick = () => guardarPrendasCalidad(codigo);
-        document.getElementById('calidadPrendasInput').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); guardarPrendasCalidad(codigo); }
-        });
-        document.getElementById('calidadPrendasInput').focus();
+        document.getElementById('calidadGuardarBtn').onclick = () => guardarCambiosCalidad(codigo);
     }
 
-    async function guardarPrendasCalidad(codigo) {
-        const nuevoValor = document.getElementById('calidadPrendasInput').value;
+    async function guardarCambiosCalidad(codigo) {
+        const nuevasPrendas = document.getElementById('calidadPrendasInput').value;
+        const nuevaManipulacion = document.getElementById('calidadManipInput').value;
         try {
             const response = await fetch(FLOW_URL_EDITAR, {
                 method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ operario: operarioActual, codigo: codigo, fecha: new Date().toISOString(), prendas: nuevoValor })
+                body: JSON.stringify({
+                    operario: operarioActual,
+                    codigo: codigo,
+                    fecha: new Date().toISOString(),
+                    prendas: nuevasPrendas,
+                    manipulacion: nuevaManipulacion
+                })
             });
             if (!response.ok) throw new Error(`Código ${response.status}`);
-            document.getElementById('calidadResultado').innerHTML += '<div style="color:#107c10; margin-top:6px;">Actualizado correctamente.</div>';
+            document.getElementById('calidadResultado').insertAdjacentHTML('beforeend', '<div style="color:#107c10; margin-top:6px;">Actualizado correctamente.</div>');
             playBeep(600);
+            document.getElementById('calidadCodigoInput').focus();
         } catch (error) {
             alert("No se pudo actualizar: " + error.message);
         }
@@ -673,7 +777,6 @@
             setTimeout(() => osc.stop(), 150);
         } catch(e) {}
     }
- 
 </script>
 
 </body>
