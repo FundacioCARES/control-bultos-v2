@@ -413,8 +413,8 @@
             alertBox.style.display = 'none';
             successBox.style.display = 'none';
 
-            if (!/^\d{19}$/.test(codigo)) {
-                alertBox.textContent = "Código no válido: debe tener 19 dígitos.";
+            if (!/^\d{20}$/.test(codigo)) {
+                alertBox.textContent = "Código no válido: debe tener 20 dígitos.";
                 alertBox.style.display = 'block';
                 playBeep(150);
                 return;
