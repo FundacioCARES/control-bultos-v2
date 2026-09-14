@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro Automático de Bultos</title>
     <style>
+        html, body { overscroll-behavior: none; }
         body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { max-width: 600px; width: 100%; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #333; margin-top: 0; }
@@ -68,17 +69,17 @@
         <div class="manip-actual">Manipulación actual: <strong id="lblManipulacionActual">-</strong></div>
 
         <div id="divEscaneo">
-            <input type="text" id="codeinput" placeholder="Dispara aquí el bulto..." autocomplete="off">
-        </div>
-
-        <div id="divPrendas" class="prendas-box">
-            <h3 style="margin-top:0; color:#333;">Bulto leído: <span id="lblCodigoActual" style="color:#0078d4;"></span></h3>
-            <div id="cajaMediasBox" style="text-align:left; margin:10px 0;">
+            <div id="cajaMediasBox" style="text-align:left; margin-bottom:10px;">
                 <label style="display:flex; align-items:center; gap:8px; font-size:15px;">
                     <input type="checkbox" id="cajaMediasCheckbox" style="width:20px; height:20px;">
                     Caja a medias
                 </label>
             </div>
+            <input type="text" id="codeinput" placeholder="Dispara aquí el bulto..." autocomplete="off">
+        </div>
+
+        <div id="divPrendas" class="prendas-box">
+            <h3 style="margin-top:0; color:#333;">Bulto leído: <span id="lblCodigoActual" style="color:#0078d4;"></span></h3>
             <label for="prendasInput"><strong>Número de prendas (Opcional):</strong></label><br>
             <input type="number" id="prendasInput" placeholder="Dejar en blanco si no aplica..." min="1" autocomplete="off">
             <button class="btn" style="background:#107c10;" onclick="enviarDatos(prendasInput.value)">Guardar Bulto</button>
@@ -176,10 +177,6 @@
     let enDescanso = false;
     let pausaInicioTs = null;
     let pausaAcumuladaMs = 0;
-
-    // Caja a medias: permite repetir un bulto ya existente si lo escanea otro operario, sumando prendas
-    let cajaMediasExistente = false;
-    let prendasExistentesCajaMedias = 0;
 
     const setupBox = document.getElementById('setupBox');
     const manipBox = document.getElementById('manipBox');
@@ -419,31 +416,24 @@
                 return;
             }
 
-            let detalle = null;
-            try {
-                const resp = await fetch(FLOW_URL_DETALLE, {
-                    method: 'POST', headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({ codigo })
-                });
-                detalle = await resp.json();
-            } catch (e) {
-                // si falla la comprobación previa, seguimos igualmente; el guardado final es quien de verdad protege
-            }
+            const esCajaMedias = document.getElementById('cajaMediasCheckbox').checked;
 
-            cajaMediasExistente = false;
-            prendasExistentesCajaMedias = 0;
-            const cajaMediasCheckboxEl = document.getElementById('cajaMediasCheckbox');
-            cajaMediasCheckboxEl.checked = false;
-
-            if (detalle && detalle.encontrado) {
-                if (detalle.operario === operarioActual) {
-                    alertBox.textContent = "Este bulto ya ha sido registrado.";
-                    alertBox.style.display = 'block';
-                    playBeep(150);
-                    return;
+            if (!esCajaMedias) {
+                try {
+                    const resp = await fetch(FLOW_URL_COMPROBAR, {
+                        method: 'POST', headers: {'Content-Type':'application/json'},
+                        body: JSON.stringify({ codigo })
+                    });
+                    const data = await resp.json();
+                    if (data.existe) {
+                        alertBox.textContent = "Este bulto ya ha sido registrado.";
+                        alertBox.style.display = 'block';
+                        playBeep(150);
+                        return;
+                    }
+                } catch (e) {
+                    // si falla la comprobación previa, seguimos igualmente; el guardado final es quien de verdad protege
                 }
-                cajaMediasExistente = true;
-                prendasExistentesCajaMedias = parseFloat(detalle.prendas) || 0;
             }
 
             codigoPendiente = codigo;
@@ -463,24 +453,7 @@
     });
 
     async function enviarDatos(numPrendas) {
-        if (cajaMediasExistente) {
-            const cajaMediasCheckboxEl = document.getElementById('cajaMediasCheckbox');
-            if (!cajaMediasCheckboxEl.checked) {
-                divPrendas.style.display = 'none';
-                divEscaneo.style.display = 'block';
-                alertBox.textContent = "Este bulto ya ha sido registrado.";
-                alertBox.style.display = 'block';
-                playBeep(150);
-                cajaMediasExistente = false;
-                prendasExistentesCajaMedias = 0;
-                codigoPendiente = "";
-                inputField.focus();
-                return;
-            }
-            await enviarDatosCajaMedias(numPrendas);
-            return;
-        }
-
+        const cajaMedias = document.getElementById('cajaMediasCheckbox').checked;
         divPrendas.style.display = 'none';
         divEscaneo.style.display = 'block';
 
@@ -497,7 +470,8 @@
                     codigo: codigoPendiente,
                     manipulacion: manipulacionActual,
                     prendas: numPrendas ? numPrendas : "",
-                    fecha: new Date().toISOString()
+                    fecha: new Date().toISOString(),
+                    cajaMedias: cajaMedias
                 })
             });
 
@@ -516,7 +490,7 @@
                 prendasManipulacion += prendasNum;
                 actualizarProductividad();
 
-                successBox.textContent = "¡Bulto guardado correctamente en la nube!";
+                successBox.textContent = cajaMedias ? "¡Bulto (caja a medias) guardado correctamente!" : "¡Bulto guardado correctamente en la nube!";
                 agregarFilaHistorial(codigoPendiente, numPrendas);
 
                 bottomCounter.textContent = `Bultos: ${totalBultos}`;
@@ -531,53 +505,7 @@
             playBeep(100);
         }
 
-        codigoPendiente = "";
-        inputField.focus();
-    }
-
-    async function enviarDatosCajaMedias(numPrendas) {
-        divPrendas.style.display = 'none';
-        divEscaneo.style.display = 'block';
-
-        const prendasAnadidas = parseFloat(numPrendas) || 0;
-        const totalPrendasBulto = prendasExistentesCajaMedias + prendasAnadidas;
-
-        try {
-            const response = await fetch(FLOW_URL_EDITAR, {
-                method: 'POST',
-                mode: 'cors',
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    operario: operarioActual,
-                    codigo: codigoPendiente,
-                    fecha: new Date().toISOString(),
-                    prendas: String(totalPrendasBulto)
-                })
-            });
-            if (!response.ok) throw new Error(`Código ${response.status}`);
-
-            totalBultos++;
-            totalPrendasGlobal += prendasAnadidas;
-            prendasCounter.textContent = `Prendas: ${totalPrendasGlobal}`;
-
-            prendasManipulacion += prendasAnadidas;
-            actualizarProductividad();
-
-            successBox.textContent = `¡Caja a medias actualizada! Ahora tiene ${totalPrendasBulto} prendas en total.`;
-            agregarFilaHistorial(codigoPendiente, totalPrendasBulto);
-
-            bottomCounter.textContent = `Bultos: ${totalBultos}`;
-            successBox.style.display = 'block';
-            playBeep(600);
-        } catch (error) {
-            alertBox.textContent = "Error al guardar en la nube: " + error.message;
-            alertBox.style.display = 'block';
-            playBeep(100);
-        }
-
         document.getElementById('cajaMediasCheckbox').checked = false;
-        cajaMediasExistente = false;
-        prendasExistentesCajaMedias = 0;
         codigoPendiente = "";
         inputField.focus();
     }
