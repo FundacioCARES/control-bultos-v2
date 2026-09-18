@@ -402,50 +402,61 @@
     }, true);
 
     // Filtro estricto para ignorar comandos extra de la pistola al leer el bulto
-    inputField.addEventListener('keydown', async function(event) {
+    async function procesarCodigoEscaneado() {
+        const codigo = inputField.value.trim();
+        if (!codigo) return;
+        inputField.value = '';
+        alertBox.style.display = 'none';
+        successBox.style.display = 'none';
+
+        if (!/^\d{20}$/.test(codigo)) {
+            alertBox.textContent = "Código no válido: debe tener 20 dígitos.";
+            alertBox.style.display = 'block';
+            playBeep(150);
+            return;
+        }
+
+        const esCajaMedias = document.getElementById('cajaMediasCheckbox').checked;
+
+        if (!esCajaMedias) {
+            try {
+                const resp = await fetch(FLOW_URL_COMPROBAR, {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ codigo })
+                });
+                const data = await resp.json();
+                if (data.existe) {
+                    alertBox.textContent = "Este bulto ya ha sido registrado.";
+                    alertBox.style.display = 'block';
+                    playBeep(150);
+                    return;
+                }
+            } catch (e) {
+                // si falla la comprobación previa, seguimos igualmente; el guardado final es quien de verdad protege
+            }
+        }
+
+        codigoPendiente = codigo;
+        lblCodigoActual.textContent = codigo;
+        divEscaneo.style.display = 'none';
+        divPrendas.style.display = 'block';
+        prendasInput.value = '';
+        prendasInput.focus();
+    }
+
+    inputField.addEventListener('keydown', function(event) {
         if (event.key.startsWith('F') && event.key.length > 1) { event.preventDefault(); return; }
 
         if (event.key === 'Enter') {
             event.preventDefault();
-            const codigo = inputField.value.trim();
-            if (!codigo) return;
-            inputField.value = '';
-            alertBox.style.display = 'none';
-            successBox.style.display = 'none';
+            procesarCodigoEscaneado();
+        }
+    });
 
-            if (!/^\d{20}$/.test(codigo)) {
-                alertBox.textContent = "Código no válido: debe tener 20 dígitos.";
-                alertBox.style.display = 'block';
-                playBeep(150);
-                return;
-            }
-
-            const esCajaMedias = document.getElementById('cajaMediasCheckbox').checked;
-
-            if (!esCajaMedias) {
-                try {
-                    const resp = await fetch(FLOW_URL_COMPROBAR, {
-                        method: 'POST', headers: {'Content-Type':'application/json'},
-                        body: JSON.stringify({ codigo })
-                    });
-                    const data = await resp.json();
-                    if (data.existe) {
-                        alertBox.textContent = "Este bulto ya ha sido registrado.";
-                        alertBox.style.display = 'block';
-                        playBeep(150);
-                        return;
-                    }
-                } catch (e) {
-                    // si falla la comprobación previa, seguimos igualmente; el guardado final es quien de verdad protege
-                }
-            }
-
-            codigoPendiente = codigo;
-            lblCodigoActual.textContent = codigo;
-            divEscaneo.style.display = 'none';
-            divPrendas.style.display = 'block';
-            prendasInput.value = '';
-            prendasInput.focus();
+    // Dispara solo en cuanto se completan los 20 dígitos (la pistola no manda Enter)
+    inputField.addEventListener('input', function() {
+        if (/^\d{20}$/.test(this.value.trim())) {
+            procesarCodigoEscaneado();
         }
     });
 
@@ -688,14 +699,14 @@
             <div><strong>Código:</strong> ${codigo}</div>
             <div><strong>Operario:</strong> ${data.operario || '-'}</div>
             <div><strong>Fecha:</strong> ${data.fecha || '-'}</div>
-            <div style="margin-top:8px;"><strong>Manipulación:</strong><br>
-                <select id="calidadManipInput" style="width:100%; padding:6px; font-size:14px; margin-top:4px; box-sizing:border-box;">
+            <div style="margin-top:12px;"><strong style="font-size:19px;">Manipulación:</strong><br>
+                <select id="calidadManipInput" style="width:100%; padding:10px; font-size:20px; margin-top:6px; box-sizing:border-box;">
                     <option value="">-- Selecciona --</option>
                     ${opciones}
                 </select>
             </div>
-            <div style="margin-top:8px;"><strong>Prendas:</strong>
-                <input type="text" inputmode="numeric" pattern="[0-9]*" id="calidadPrendasInput" value="${data.prendas || ''}" style="width:80px; padding:6px; font-size:14px; margin-left:6px;">
+            <div style="margin-top:16px;"><strong style="font-size:19px;">Prendas:</strong>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="calidadPrendasInput" value="${data.prendas || ''}" style="width:110px; padding:10px; font-size:20px; margin-left:8px;">
             </div>
             <button id="calidadGuardarBtn" style="margin-top:10px; padding:8px 16px; font-size:14px; cursor:pointer;">Guardar cambios</button>
         `;
