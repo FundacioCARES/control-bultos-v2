@@ -47,9 +47,16 @@
 
     <!-- Paso 1: Identificación del operario -->
     <div class="setup-box" id="setupBox">
-        <label for="operarioInput"><strong>Identifícate para empezar:</strong></label><br>
-        <input type="text" id="operarioInput" placeholder="Escanea o escribe tu ID de Operario..." autocomplete="off">
-        <button class="btn" onclick="guardarOperario()">Comenzar Turno</button>
+        <label for="operarioSearchInput"><strong>Identifícate para empezar:</strong></label><br>
+        <input type="text" id="operarioSearchInput" placeholder="Buscar tu Nº de operario..." autocomplete="off">
+        <div class="manip-list" id="operarioList" style="margin-top:8px; max-height:180px;">
+            <div style="padding:14px; text-align:center; color:#666;">Cargando listado...</div>
+        </div>
+        <div id="operarioSeleccionadoBox" style="display:none; margin-top:10px; text-align:left; background:#fff; border:1px solid #ccc; border-radius:4px; padding:10px 14px;">
+            Nº Operario: <strong id="lblOperarioIdSeleccionado"></strong>
+            <div id="lblOperarioNombreSeleccionado" style="font-size:22px; font-weight:bold; color:#0078d4; margin-top:4px;"></div>
+        </div>
+        <button class="btn" id="comenzarTurnoBtn" style="display:none;" onclick="guardarOperario()">Comenzar Turno</button>
         <button class="btn" style="margin-top:8px; background:#6f42c1;" onclick="abrirCalidad()">Calidad</button>
     </div>
 
@@ -133,6 +140,7 @@
     const FLOW_URL_SESION_INICIO = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/13/workflows/77e5897eaf494f229bfe0e3494e0c9d3/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=GiL52Ip1FyODK2cefAg0__-Dws2ysXTymNSO5Nx-Odc";
     const FLOW_URL_SESION_FIN = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/16/workflows/d14828a681324753b681a52e4d71e660/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jaqEFLD223k6t2qadslVsEWcFng89wucRxVv9-dsxWQ";
     const FLOW_URL_DETALLE = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/29/workflows/50ddece195704456b14e66f2ae8e41da/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=nsbxnyd4HWO4ibcWKoyMdjTLIYJBbZd29TbNa8cHcPI";
+    const FLOW_URL_OPERARIOS = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/06/workflows/db13924a3e254ae6ac73154a20d1357e/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=1UVFLs_crpsDT1IPEM5jm4Sl3Y1OdNfVYdMdrgPhisc";
 
     let sesionActualId = null;
 
@@ -183,7 +191,12 @@
     const manipList = document.getElementById('manipList');
     const cancelarManipBtn = document.getElementById('cancelarManipBtn');
     const scannerSection = document.getElementById('scannerSection');
-    const operarioInput = document.getElementById('operarioInput');
+    const operarioSearchInput = document.getElementById('operarioSearchInput');
+    const operarioList = document.getElementById('operarioList');
+    const operarioSeleccionadoBox = document.getElementById('operarioSeleccionadoBox');
+    const lblOperarioIdSeleccionado = document.getElementById('lblOperarioIdSeleccionado');
+    const lblOperarioNombreSeleccionado = document.getElementById('lblOperarioNombreSeleccionado');
+    const comenzarTurnoBtn = document.getElementById('comenzarTurnoBtn');
     const lblOperario = document.getElementById('lblOperario');
     const lblManipulacionActual = document.getElementById('lblManipulacionActual');
     const inputField = document.getElementById('codeinput');
@@ -202,27 +215,90 @@
     const recordatoriosLista = document.getElementById('recordatoriosLista');
 
     window.onload = function() {
-        operarioInput.focus();
+        operarioSearchInput.focus();
+        cargarOperadores();
     };
 
-    operarioInput.addEventListener('keydown', function(event) {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            guardarOperario();
-        }
-    });
-
     function guardarOperario() {
-        const id = operarioInput.value.trim();
-        if (!id) {
-            alert("Por favor, introduce un ID de operario válido.");
+        if (!operarioActual) {
+            alert("Por favor, selecciona tu Nº de operario de la lista.");
             return;
         }
-        operarioActual = id;
-        lblOperario.textContent = id;
+        lblOperario.textContent = operarioActual;
         setupBox.style.display = 'none';
         esCambioDeManipulacion = false;
         abrirSelectorManipulacion();
+    }
+
+    // ---------- Selección de operario ----------
+
+    let operadoresData = [];
+    let nombreOperarioActual = "";
+
+    async function cargarOperadores() {
+        operarioList.innerHTML = `<div style="padding:14px; text-align:center; color:#666;">Cargando listado...</div>`;
+        try {
+            const response = await fetch(FLOW_URL_OPERARIOS, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            if (!response.ok) throw new Error(`Código ${response.status}`);
+            const data = await response.json();
+            if (!Array.isArray(data) || data.length === 0) {
+                operarioList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">No se ha podido cargar el listado.</div>`;
+                return;
+            }
+            operadoresData = data;
+            renderOperarioList(data);
+        } catch (error) {
+            operarioList.innerHTML = `<div style="padding:14px; text-align:center; color:#a80000;">Error cargando operarios: ${error.message}</div>`;
+        }
+    }
+
+    async function asegurarOperadoresCargados() {
+        if (operadoresData.length > 0) return;
+        try {
+            const response = await fetch(FLOW_URL_OPERARIOS, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const data = await response.json();
+            if (Array.isArray(data)) operadoresData = data;
+        } catch (e) {
+            // si falla, Calidad simplemente no podrá mostrar el nombre
+        }
+    }
+
+    function renderOperarioList(data) {
+        operarioList.innerHTML = '';
+        if (data.length === 0) {
+            operarioList.innerHTML = `<div style="padding:14px; text-align:center; color:#666;">Sin resultados.</div>`;
+            return;
+        }
+        data.forEach(o => {
+            const div = document.createElement('div');
+            div.className = 'manip-item';
+            div.textContent = o.operario;
+            div.onclick = () => seleccionarOperario(o.operario, o.nombre || '');
+            operarioList.appendChild(div);
+        });
+    }
+
+    operarioSearchInput.addEventListener('input', (e) => {
+        const texto = normalizarTexto(e.target.value);
+        const filtrado = operadoresData.filter(o => normalizarTexto(o.operario).includes(texto));
+        renderOperarioList(filtrado);
+    });
+
+    function seleccionarOperario(codigo, nombre) {
+        operarioActual = codigo;
+        nombreOperarioActual = nombre;
+        lblOperarioIdSeleccionado.textContent = codigo;
+        lblOperarioNombreSeleccionado.textContent = nombre;
+        operarioSeleccionadoBox.style.display = 'block';
+        comenzarTurnoBtn.style.display = 'block';
     }
 
     // ---------- Selección / cambio de manipulación ----------
@@ -388,7 +464,7 @@
         if (document.activeElement && ['inputEdicionPrendas', 'calidadCodigoInput', 'calidadManipInput', 'calidadPrendasInput'].includes(document.activeElement.id)) return; // no interferir mientras se edita o se usa Calidad
         let campoCorrecto;
         if (setupBox.style.display !== 'none') {
-            campoCorrecto = operarioInput;
+            campoCorrecto = operarioSearchInput;
         } else if (divPrendas.style.display === 'block') {
             campoCorrecto = prendasInput;
         } else if (scannerSection.style.display !== 'none') {
@@ -633,7 +709,7 @@
         if (operarioActual) {
             inputField.focus();
         } else {
-            operarioInput.focus();
+            operarioSearchInput.focus();
         }
     }
 
@@ -660,6 +736,7 @@
         resultadoBox.innerHTML = 'Buscando...';
         try {
             await asegurarManipulacionesCargadas();
+            await asegurarOperadoresCargados();
             const resp = await fetch(FLOW_URL_DETALLE, {
                 method: 'POST', headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({ codigo })
@@ -695,9 +772,12 @@
         const opciones = manipulacionesData.map(m =>
             `<option value="${m.codigo}" ${m.codigo === data.manipulacion ? 'selected' : ''}>${m.codigo}</option>`
         ).join('');
+        const operadorEncontrado = operadoresData.find(o => o.operario === data.operario);
+        const nombreOperario = operadorEncontrado ? operadorEncontrado.nombre : '';
         resultadoBox.innerHTML = `
             <div><strong>Código:</strong> ${codigo}</div>
             <div><strong>Operario:</strong> ${data.operario || '-'}</div>
+            <div style="font-size:22px; font-weight:bold; color:#0078d4; margin-top:2px;">${nombreOperario}</div>
             <div><strong>Fecha:</strong> ${data.fecha || '-'}</div>
             <div style="margin-top:12px;"><strong style="font-size:19px;">Manipulación:</strong><br>
                 <select id="calidadManipInput" style="width:100%; padding:10px; font-size:20px; margin-top:6px; box-sizing:border-box;">
