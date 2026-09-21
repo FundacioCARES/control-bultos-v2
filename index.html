@@ -71,7 +71,7 @@
 
     <!-- Panel de trabajo del escáner -->
     <div id="scannerSection" style="display:none;">
-        <div class="counter" id="contador">Operario: <span id="lblOperario"></span></div>
+        <div class="counter" id="contador">Operario: <span id="lblOperario"></span> <span id="lblOperarioNombreActual" style="color:#333; font-size:18px; font-weight:600;"></span></div>
         <div class="manip-actual">Manipulación actual: <strong id="lblManipulacionActual">-</strong></div>
 
         <div id="divEscaneo">
@@ -224,6 +224,7 @@
             return;
         }
         lblOperario.textContent = operarioActual;
+        document.getElementById('lblOperarioNombreActual').textContent = nombreOperarioActual ? `— ${nombreOperarioActual}` : '';
         setupBox.style.display = 'none';
         esCambioDeManipulacion = false;
         abrirSelectorManipulacion();
