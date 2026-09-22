@@ -86,8 +86,8 @@
 
         <div id="divPrendas" class="prendas-box">
             <h3 style="margin-top:0; color:#333;">Bulto leído: <span id="lblCodigoActual" style="color:#0078d4;"></span></h3>
-            <label for="prendasInput"><strong>Número de prendas (Opcional):</strong></label><br>
-            <input type="number" id="prendasInput" placeholder="Dejar en blanco si no aplica..." min="1" autocomplete="off">
+            <label for="prendasInput"><strong>Número de prendas:</strong></label><br>
+            <input type="number" id="prendasInput" placeholder="Introduce el número de prendas..." min="1" autocomplete="off">
             <button class="btn" style="background:#107c10;" onclick="enviarDatos(prendasInput.value)">Guardar Bulto</button>
         </div>
 
@@ -139,7 +139,7 @@
     const FLOW_URL_SESION_INICIO = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/13/workflows/77e5897eaf494f229bfe0e3494e0c9d3/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=GiL52Ip1FyODK2cefAg0__-Dws2ysXTymNSO5Nx-Odc";
     const FLOW_URL_SESION_FIN = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/16/workflows/d14828a681324753b681a52e4d71e660/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jaqEFLD223k6t2qadslVsEWcFng89wucRxVv9-dsxWQ";
     const FLOW_URL_DETALLE = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/29/workflows/50ddece195704456b14e66f2ae8e41da/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=nsbxnyd4HWO4ibcWKoyMdjTLIYJBbZd29TbNa8cHcPI";
-    const FLOW_URL_OPERARIOS = "https://default77fff5221e97410bbfa71c6a072137.c8.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/06/workflows/db13924a3e254ae6ac73154a20d1357e/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=1UVFLs_crpsDT1IPEM5jm4Sl3Y1OdNfVYdMdrgPhisc";
+    const FLOW_URL_OPERARIOS = "https://TU_FLUJO_OBTENER_OPERADORES_AQUI";
 
     let sesionActualId = null;
 
@@ -544,6 +544,13 @@
     });
 
     async function enviarDatos(numPrendas) {
+        if (!numPrendas || !numPrendas.toString().trim()) {
+            alertBox.textContent = "Debes indicar el número de prendas.";
+            alertBox.style.display = 'block';
+            playBeep(150);
+            return;
+        }
+
         const cajaMedias = document.getElementById('cajaMediasCheckbox').checked;
         divPrendas.style.display = 'none';
         divEscaneo.style.display = 'block';
