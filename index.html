@@ -106,6 +106,7 @@
         <div class="productividad" id="productividadBox">Productividad: 0,0 prendas/hora</div>
 
         <button class="btn btn-secundario" style="margin-top:15px;" onclick="abrirCambioManipulacion()">Cambiar Manipulación</button>
+        <button class="btn" style="margin-top:8px; background:#e67e22;" onclick="verObservaciones()">Ver observaciones</button>
         <button class="btn" id="descansoBtn" style="margin-top:8px; background:#5c6673;" onclick="toggleDescanso()">Iniciar Descanso</button>
         <button class="btn btn-peligro" tabindex="-1" onclick="cambiarOperario()">Finalizar / Cambiar Operario</button>
     </div>
@@ -127,6 +128,15 @@
         <h3>Antes de empezar, ten en cuenta:</h3>
         <ul id="recordatoriosLista"></ul>
         <button class="btn" onclick="confirmarManipulacionSeleccionada()">Entendido, empezar</button>
+    </div>
+</div>
+
+<!-- Modal de consulta de observaciones (solo informativo, en cualquier momento) -->
+<div class="modal-overlay" id="observacionesModal">
+    <div class="modal-box">
+        <h3>Observaciones de la manipulación</h3>
+        <ul id="observacionesLista"></ul>
+        <button class="btn btn-secundario" onclick="cerrarObservaciones()">Cerrar</button>
     </div>
 </div>
 
@@ -169,6 +179,8 @@
     let operarioActual = "";
     let manipulacionActual = "";
     let manipulacionPendienteSeleccion = null; // {codigo, recordatorio}
+    let recordatorioPendiente = "";
+    let recordatorioActual = ""; // observaciones de la manipulación en curso (para volver a consultarlas)
     let esCambioDeManipulacion = false;
     let codigoPendiente = "";
     let totalBultos = 0;
@@ -358,6 +370,7 @@
 
     function seleccionarManipulacion(codigo, recordatorio) {
         manipulacionPendienteSeleccion = codigo;
+        recordatorioPendiente = recordatorio || '';
         recordatoriosLista.innerHTML = '';
         const lineas = (recordatorio || '').split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
@@ -377,6 +390,7 @@
         finalizarSesionActual().then(() => iniciarSesion(manipulacionPendienteSeleccion));
         recordatoriosModal.style.display = 'none';
         manipulacionActual = manipulacionPendienteSeleccion;
+        recordatorioActual = recordatorioPendiente;
         lblManipulacionActual.textContent = manipulacionActual;
 
         // Reinicia el contador de productividad para la nueva manipulación
@@ -442,6 +456,29 @@
         }
     }
 
+    function verObservaciones() {
+        const lista = document.getElementById('observacionesLista');
+        lista.innerHTML = '';
+        const lineas = (recordatorioActual || '').split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (lineas.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = 'Esta manipulación no tiene observaciones.';
+            lista.appendChild(li);
+        } else {
+            lineas.forEach(linea => {
+                const li = document.createElement('li');
+                li.textContent = linea;
+                lista.appendChild(li);
+            });
+        }
+        document.getElementById('observacionesModal').style.display = 'flex';
+    }
+
+    function cerrarObservaciones() {
+        document.getElementById('observacionesModal').style.display = 'none';
+        if (!enDescanso && scannerSection.style.display !== 'none' && divPrendas.style.display === 'none') inputField.focus();
+    }
+
     function cambiarOperario() {
         if (confirm("¿Seguro que deseas finalizar la sesión de este operario?")) {
             finalizarSesionActual();
@@ -451,7 +488,7 @@
 
     // Mantener el foco en el campo de lectura de bultos
     document.addEventListener('click', (e) => {
-        if (e.target.closest && (e.target.closest('#ultimoBultoBox') || e.target.closest('#calidadModal'))) return; // no interferir en edición de prendas ni en Calidad
+        if (e.target.closest && (e.target.closest('#ultimoBultoBox') || e.target.closest('#calidadModal') || e.target.closest('#observacionesModal'))) return; // no interferir en edición de prendas, Calidad ni observaciones
         if (scannerSection.style.display !== 'none' && divPrendas.style.display === 'none') {
             inputField.focus();
         }
