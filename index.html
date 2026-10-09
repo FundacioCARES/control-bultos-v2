@@ -81,7 +81,17 @@
                     Caja a medias
                 </label>
             </div>
+            <div id="reoTipoBox" style="display:none; text-align:left; margin-bottom:10px;">
+                <label for="reoTipoInput" style="font-weight:bold; font-size:15px;">Tipo de reoperado (observaciones):</label>
+                <input type="text" id="reoTipoInput" placeholder="Escribe el tipo de reoperado..." maxlength="100" autocomplete="off">
+            </div>
             <input type="text" id="codeinput" placeholder="Dispara aquí el bulto..." autocomplete="off">
+            <div id="reoperadoBox" style="display:none; margin-top:12px; background:#fff4ce; border:2px solid #ffaa44; border-radius:6px; padding:12px; text-align:center;">
+                <div style="font-size:16px; color:#333;">Prendas escaneadas sin guardar: <strong id="reoPendientes" style="font-size:24px; color:#a80000;">0</strong></div>
+                <div id="reoUltimo" style="font-size:13px; color:#666; margin-top:4px; word-break:break-all;"></div>
+                <button class="btn" style="background:#107c10;" onclick="guardarReoperado()">Guardar prendas escaneadas</button>
+                <button class="btn btn-secundario" onclick="deshacerReoperado()">Deshacer último escaneo</button>
+            </div>
         </div>
 
         <div id="divPrendas" class="prendas-box">
@@ -182,6 +192,17 @@
     let recordatorioPendiente = "";
     let recordatorioActual = ""; // observaciones de la manipulación en curso (para volver a consultarlas)
     let esCambioDeManipulacion = false;
+
+    // REOPERADO: prendas sin etiqueta de bulto, se pican una a una y se guardan por tandas
+    const MANIP_REOPERADO = 'REOPERADO';
+    let reoPendientes = 0;
+    let reoUltimoCodigo = "";
+    let reoTipo = ""; // tipo de reoperado de las prendas pendientes de guardar
+    let reoTimer = null;
+    let reoGuardando = false;
+    function esReoperado() {
+        return (manipulacionActual || '').trim().toUpperCase() === MANIP_REOPERADO;
+    }
     let codigoPendiente = "";
     let totalBultos = 0;
     let totalPrendasGlobal = 0;
@@ -409,10 +430,105 @@
         scannerSection.style.display = 'block';
         divEscaneo.style.display = 'block';
         divPrendas.style.display = 'none';
+        aplicarModoManipulacion();
         inputField.focus();
     }
 
-    function abrirCambioManipulacion() {
+    function aplicarModoManipulacion() {
+        const reo = esReoperado();
+        document.getElementById('cajaMediasBox').style.display = reo ? 'none' : 'block';
+        if (reo) document.getElementById('cajaMediasCheckbox').checked = false;
+        document.getElementById('reoperadoBox').style.display = reo ? 'block' : 'none';
+        document.getElementById('reoTipoBox').style.display = reo ? 'block' : 'none';
+        inputField.placeholder = reo ? 'Pica aquí las prendas...' : 'Dispara aquí el bulto...';
+        ultimoBultoBox.style.display = (!reo && ultimoBultoBox.dataset.codigo) ? 'block' : 'none';
+        alertBox.style.display = 'none';
+        successBox.style.display = 'none';
+        refrescarReoperado();
+    }
+
+    function refrescarReoperado() {
+        document.getElementById('reoPendientes').textContent = reoPendientes;
+        document.getElementById('reoUltimo').textContent = reoUltimoCodigo ? ('Último: ' + reoUltimoCodigo) : '';
+    }
+
+    // Suma una prenda (un escaneo = una prenda)
+    function registrarPrendaReoperado(codigo) {
+        reoPendientes++;
+        reoUltimoCodigo = codigo;
+        totalPrendasGlobal++;
+        prendasManipulacion++;
+        prendasCounter.textContent = `Prendas: ${totalPrendasGlobal}`;
+        actualizarProductividad();
+        refrescarReoperado();
+        playBeep(600);
+    }
+
+    function deshacerReoperado() {
+        if (reoPendientes <= 0) return;
+        reoPendientes--;
+        totalPrendasGlobal--;
+        prendasManipulacion--;
+        reoUltimoCodigo = "";
+        prendasCounter.textContent = `Prendas: ${totalPrendasGlobal}`;
+        actualizarProductividad();
+        refrescarReoperado();
+        inputField.focus();
+    }
+
+    // Guarda las prendas pendientes en UNA sola fila (sin código de bulto). Devuelve true si todo queda guardado.
+    async function guardarReoperado() {
+        if (reoPendientes <= 0) return true;
+        if (reoGuardando) return false;
+        reoGuardando = true;
+        const n = reoPendientes;
+        let ok = false;
+        try {
+            const response = await fetch(FLOW_URL, {
+                method: 'POST',
+                mode: 'cors',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    operario: operarioActual,
+                    codigo: "",
+                    manipulacion: manipulacionActual,
+                    prendas: String(n),
+                    fecha: new Date().toISOString(),
+                    cajaMedias: false,
+                    reoperado: true,
+                    observaciones: reoTipo
+                })
+            });
+            if (!response.ok) throw new Error(`Código ${response.status}`);
+            reoPendientes -= n; // si se han picado más durante el guardado, siguen pendientes
+            alertBox.style.display = 'none';
+            successBox.textContent = `¡${n} prendas guardadas correctamente!`;
+            successBox.style.display = 'block';
+            playBeep(600);
+            ok = true;
+        } catch (error) {
+            alertBox.textContent = "Error al guardar las prendas (siguen pendientes): " + error.message;
+            alertBox.style.display = 'block';
+            playBeep(100);
+        }
+        reoGuardando = false;
+        refrescarReoperado();
+        inputField.focus();
+        return ok;
+    }
+
+    window.addEventListener('beforeunload', (e) => {
+        if (reoPendientes > 0) { e.preventDefault(); e.returnValue = ''; }
+    });
+
+    async function abrirCambioManipulacion() {
+        if (esReoperado() && reoPendientes > 0) {
+            const ok = await guardarReoperado();
+            if (!ok) return; // no se cambia de manipulación hasta que queden guardadas
+        }
         esCambioDeManipulacion = true;
         scannerSection.style.display = 'none';
         abrirSelectorManipulacion();
@@ -434,9 +550,13 @@
         productividadBox.textContent = `Productividad (${manipulacionActual}): ${productividad.toFixed(1)} prendas/hora`;
     }
 
-    function toggleDescanso() {
+    async function toggleDescanso() {
         const btn = document.getElementById('descansoBtn');
         if (!enDescanso) {
+            if (esReoperado() && reoPendientes > 0) {
+                const ok = await guardarReoperado();
+                if (!ok) return;
+            }
             enDescanso = true;
             pausaInicioTs = Date.now();
             inputField.disabled = true;
@@ -479,8 +599,13 @@
         if (!enDescanso && scannerSection.style.display !== 'none' && divPrendas.style.display === 'none') inputField.focus();
     }
 
-    function cambiarOperario() {
+    async function cambiarOperario() {
         if (confirm("¿Seguro que deseas finalizar la sesión de este operario?")) {
+            if (esReoperado() && reoPendientes > 0) {
+                const ok = await guardarReoperado();
+                if (!ok && !confirm("No se han podido guardar " + reoPendientes + " prendas. ¿Salir igualmente y perderlas?")) return;
+                reoPendientes = 0; // evita el aviso de salida
+            }
             finalizarSesionActual();
             location.reload();
         }
@@ -488,7 +613,7 @@
 
     // Mantener el foco en el campo de lectura de bultos
     document.addEventListener('click', (e) => {
-        if (e.target.closest && (e.target.closest('#ultimoBultoBox') || e.target.closest('#calidadModal') || e.target.closest('#observacionesModal'))) return; // no interferir en edición de prendas, Calidad ni observaciones
+        if (e.target.closest && (e.target.closest('#ultimoBultoBox') || e.target.closest('#calidadModal') || e.target.closest('#observacionesModal') || e.target.closest('#reoTipoBox'))) return; // no interferir en edición de prendas, Calidad, observaciones ni tipo de reoperado
         if (scannerSection.style.display !== 'none' && divPrendas.style.display === 'none') {
             inputField.focus();
         }
@@ -498,7 +623,7 @@
     // (incluida una perdida de la pistola) pueda llegar a otro elemento
     document.addEventListener('keydown', function(e) {
         if (enDescanso) return; // en descanso no se fuerza el foco al escáner
-        if (document.activeElement && ['inputEdicionPrendas', 'calidadCodigoInput', 'calidadManipInput', 'calidadPrendasInput'].includes(document.activeElement.id)) return; // no interferir mientras se edita o se usa Calidad
+        if (document.activeElement && ['inputEdicionPrendas', 'calidadCodigoInput', 'calidadManipInput', 'calidadPrendasInput', 'reoTipoInput'].includes(document.activeElement.id)) return; // no interferir mientras se edita o se usa Calidad o el tipo de reoperado
         let campoCorrecto;
         if (setupBox.style.display !== 'none') {
             campoCorrecto = operarioSearchInput;
@@ -521,6 +646,26 @@
         inputField.value = '';
         alertBox.style.display = 'none';
         successBox.style.display = 'none';
+
+        if (esReoperado()) { // REOPERADO: sin límites de longitud ni de inicio, cada escaneo suma 1 prenda
+            const tipoField = document.getElementById('reoTipoInput');
+            const tipo = tipoField.value.trim();
+            if (!tipo) {
+                alertBox.textContent = "Indica primero el tipo de reoperado.";
+                alertBox.style.display = 'block';
+                playBeep(150);
+                tipoField.focus();
+                return;
+            }
+            if (reoPendientes > 0 && tipo !== reoTipo) {
+                // cambió el tipo: se guardan antes las prendas anteriores con su tipo
+                const ok = await guardarReoperado();
+                if (!ok) { tipoField.value = reoTipo; return; }
+            }
+            reoTipo = tipo;
+            registrarPrendaReoperado(codigo);
+            return;
+        }
 
         if (!/^0038\d{16}$/.test(codigo)) {
             alertBox.textContent = "Atención, no estás escaneando el código de bulto.";
@@ -557,17 +702,28 @@
         prendasInput.focus();
     }
 
+    document.getElementById('reoTipoInput').addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') { event.preventDefault(); inputField.focus(); }
+    });
+
     inputField.addEventListener('keydown', function(event) {
         if (event.key.startsWith('F') && event.key.length > 1) { event.preventDefault(); return; }
 
         if (event.key === 'Enter') {
             event.preventDefault();
+            clearTimeout(reoTimer);
             procesarCodigoEscaneado();
         }
     });
 
     // Dispara solo en cuanto se completan los 20 dígitos (la pistola no manda Enter)
+    // En REOPERADO el código puede tener cualquier longitud: se da por leído cuando dejan de llegar caracteres
     inputField.addEventListener('input', function() {
+        if (esReoperado()) {
+            clearTimeout(reoTimer);
+            if (this.value.trim()) reoTimer = setTimeout(procesarCodigoEscaneado, 250);
+            return;
+        }
         if (/^\d{20}$/.test(this.value.trim())) {
             procesarCodigoEscaneado();
         }
